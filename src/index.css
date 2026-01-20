@@ -1,0 +1,79 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Light defaults */
+  --bg: #ffffff;
+  --fg: #213547;
+  --link: #3b5bdb;
+  --link-hover: #364fc7;
+  --button-bg: #f1f3f5;
+  --button-fg: #212529;
+  --card-bg: #ffffff;
+  --border: #e5e7eb;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark theme overrides */
+:root[data-theme='dark'] {
+  --bg: #242424;
+  --fg: rgba(255, 255, 255, 0.87);
+  --link: #747bff;
+  --link-hover: #646cff;
+  --button-bg: #1a1a1a;
+  --button-fg: #e9ecef;
+  --card-bg: #2a2a2a;
+  --border: #2f3133;
+}
+
+a {
+  font-weight: 500;
+  color: var(--link);
+  text-decoration: inherit;
+}
+a:hover {
+  color: var(--link-hover);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--button-bg);
+  color: var(--button-fg);
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+
+hr, .divider, [data-border-top] {
+  border-color: var(--border);
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* media-based default no longer needed; explicit toggle via data-theme controls */
