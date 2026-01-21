@@ -6,8 +6,12 @@ import { useTableId } from '../hooks/useTableId'
 import { getSession, isExpired } from '../utils/tableSession'
 import { BRAND } from '../config/brand'
 
+// types
+ type OrderItem = { name: string; qty: number }
+ type Order = { id: string; tableId: number; createdAt: string; totalCents: number; items: OrderItem[]; note?: string }
+
 // simple mock orders
-const mockOrders = [
+const mockOrders: Order[] = [
   { id: 'o1', tableId: 1, createdAt: '2026-01-20T12:00:00Z', totalCents: 52000, items: [ { name: 'Espresso', qty: 2 }, { name: 'Croissant', qty: 1 } ] },
   { id: 'o2', tableId: 1, createdAt: '2026-01-20T13:10:00Z', totalCents: 38000, items: [ { name: 'Masala Chai', qty: 2 } ] },
   { id: 'o3', tableId: 1, createdAt: '2026-01-20T14:05:00Z', totalCents: 45000, items: [ { name: 'Cappuccino', qty: 1 }, { name: 'Veg Sandwich', qty: 1 } ] },
@@ -59,6 +63,12 @@ export default function OrdersPage() {
                   <Text key={idx}>{it.name} × {it.qty}</Text>
                 ))}
               </VStack>
+              {o.note && (
+                <Box mt={2}>
+                  <Text fontSize="sm" color="fg.muted">Note</Text>
+                  <Text fontSize="sm">{o.note}</Text>
+                </Box>
+              )}
               <HStack justify="space-between" mt={2}>
                 <Text>Total</Text>
                 <Text fontWeight="semibold">{toPrice(o.totalCents)}</Text>

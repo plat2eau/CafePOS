@@ -9,18 +9,23 @@ export type CartItem = {
 
 export type CartState = {
   items: Record<string, CartItem>
+  orderNote: string
+  setOrderNote: (note: string) => void
   addItem: (item: Omit<CartItem, 'qty'>, qty?: number) => void
   increment: (itemId: string) => void
   decrement: (itemId: string) => void
   setQty: (itemId: string, qty: number) => void
   remove: (itemId: string) => void
-  clear: () => void
+  clear: () => void // clears items only
+  reset: () => void // clears items + note
   getList: () => CartItem[]
   subtotalCents: () => number
 }
 
 export const useCart = create<CartState>((set, get) => ({
   items: {},
+  orderNote: '',
+  setOrderNote: (note) => set({ orderNote: note }),
   addItem: (item, qty = 1) =>
     set((state) => {
       const existing = state.items[item.itemId]
@@ -68,6 +73,7 @@ export const useCart = create<CartState>((set, get) => ({
       return { items: copy }
     }),
   clear: () => set({ items: {} }),
+  reset: () => set({ items: {}, orderNote: '' }),
   getList: () => Object.values(get().items),
   subtotalCents: () => get().getList().reduce((sum, it) => sum + it.priceCents * it.qty, 0),
 }))

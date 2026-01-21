@@ -7,6 +7,7 @@ export default function OrderButton() {
   const itemsObj = useCart(s => s.items)
   const items = Object.values(itemsObj)
   const clear = useCart(s => s.clear)
+  const orderNote = useCart(s => s.orderNote)
 
   const placeOrder = () => {
     if (!tableId) return
@@ -14,6 +15,7 @@ export default function OrderButton() {
       tableId,
       items: items.map(i => ({ itemId: i.itemId, name: i.name, priceCents: i.priceCents, qty: i.qty })),
       createdAt: new Date().toISOString(),
+      note: orderNote || undefined,
     }
     console.log('OrderDraft:', order)
     alert('Order placed! Check console for payload.')

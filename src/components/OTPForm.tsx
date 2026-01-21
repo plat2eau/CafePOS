@@ -53,7 +53,8 @@ export default function OTPForm({ tableId, onVerified }: { tableId: number, onVe
             Verify
           </Button>
         </HStack>
-        <Text mt={2} color="fg.muted" fontSize="sm">Use 000000 in dev.</Text>
+        <Text mt={2} color="fg.muted" fontSize="sm">Ask your server for the OTP.</Text>
+        <Text mt={1} color="fg.muted" fontSize="sm">Use 000000 in dev.</Text>
       </form>
     </Box>
   )

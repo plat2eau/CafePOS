@@ -1,4 +1,4 @@
-import { Box, HStack, VStack, Text, Button, IconButton } from '@chakra-ui/react'
+import { Box, HStack, VStack, Text, Button, IconButton, Textarea } from '@chakra-ui/react'
 import { useState } from 'react'
 import { useCart } from '../state/cartStore'
 import { useTableId } from '../hooks/useTableId'
@@ -9,12 +9,16 @@ export default function BottomActionBar() {
   const itemsObj = useCart(s => s.items)
   const items = Object.values(itemsObj)
   const clear = useCart(s => s.clear)
+  const reset = useCart(s => s.reset)
+  const orderNote = useCart(s => s.orderNote)
+  const setOrderNote = useCart(s => s.setOrderNote)
   const tableId = useTableId()
 
   const subtotal = items.reduce((sum, it) => sum + it.priceCents * it.qty, 0)
   const count = items.reduce((sum, it) => sum + it.qty, 0)
 
   const [open, setOpen] = useState(false)
+  const [showNote, setShowNote] = useState(false)
 
   const placeOrder = () => {
     if (!tableId || items.length === 0) return
@@ -22,10 +26,11 @@ export default function BottomActionBar() {
       tableId,
       items: items.map(i => ({ itemId: i.itemId, name: i.name, priceCents: i.priceCents, qty: i.qty })),
       createdAt: new Date().toISOString(),
+      note: orderNote || undefined,
     }
     console.log('OrderDraft:', order)
     alert('Order placed! Check console for payload.')
-    clear()
+    reset()
   }
 
   return (
@@ -35,9 +40,16 @@ export default function BottomActionBar() {
           <Text fontWeight="semibold">Your selection</Text>
           <Text fontSize="sm" color="fg.muted">{count} item{count === 1 ? '' : 's'} • {toPrice(subtotal)}</Text>
         </VStack>
-        <IconButton aria-label={open ? 'Hide details' : 'Show details'} variant="ghost" size="sm" onClick={() => setOpen(o => !o)}>
-          <Text>{open ? '▲' : '▼'}</Text>
-        </IconButton>
+        <HStack gap={1}>
+          {(items.length > 0) && (
+            <IconButton aria-label={orderNote ? 'Edit note' : 'Add note'} title={orderNote ? 'Edit note' : 'Add note'} variant="ghost" size="sm" onClick={() => { setShowNote(true); setOpen(true); }}>
+              <Text>📝{orderNote ? '•' : ''}</Text>
+            </IconButton>
+          )}
+          <IconButton aria-label={open ? 'Hide details' : 'Show details'} variant="ghost" size="sm" onClick={() => setOpen(o => { const next = !o; if (!next) setShowNote(false); return next; })}>
+            <Text>{open ? '▲' : '▼'}</Text>
+          </IconButton>
+        </HStack>
       </HStack>
 
       {open && (
@@ -56,6 +68,21 @@ export default function BottomActionBar() {
               </HStack>
             </HStack>
           ))}
+        </VStack>
+      )}
+
+      {open && (showNote || orderNote.length > 0) && (
+        <VStack align="stretch" mt={3}>
+          <Textarea
+            value={orderNote}
+            onChange={(e) => setOrderNote(e.target.value.slice(0, 200))}
+            placeholder="Add a note for the kitchen (optional)"
+            rows={3}
+            autoFocus
+          />
+          <HStack justify="flex-end">
+            <Text fontSize="xs" color="fg.muted">{orderNote.length}/200</Text>
+          </HStack>
         </VStack>
       )}
 
