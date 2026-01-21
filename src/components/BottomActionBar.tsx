@@ -63,7 +63,7 @@ export default function BottomActionBar() {
         <Button variant="ghost" flex={1} onClick={clear} disabled={items.length === 0}>
           Clear
         </Button>
-        <Button flex={2} onClick={placeOrder} disabled={!tableId || items.length === 0} bg="var(--button-bg)" color="var(--button-fg)">
+        <Button flex={2} onClick={placeOrder} disabled={!tableId || items.length === 0} className="brand-btn">
           Place Order
         </Button>
       </HStack>

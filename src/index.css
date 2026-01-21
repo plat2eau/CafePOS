@@ -10,8 +10,12 @@
   --link-hover: #364fc7;
   --button-bg: #f1f3f5;
   --button-fg: #212529;
-  --card-bg: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.88);
   --border: #e5e7eb;
+  --brand-grad-start: #ff7a59;
+  --brand-grad-end: #7b5cff;
+  --brand-gradient: linear-gradient(90deg, var(--brand-grad-start), var(--brand-grad-end));
+  --brand-glow: 0 8px 24px rgba(123, 92, 255, 0.25);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -27,8 +31,12 @@
   --link-hover: #646cff;
   --button-bg: #1a1a1a;
   --button-fg: #e9ecef;
-  --card-bg: #2a2a2a;
+  --card-bg: rgba(42, 42, 42, 0.86);
   --border: #2f3133;
+  --brand-grad-start: #ff8f70;
+  --brand-grad-end: #8c6cff;
+  --brand-gradient: linear-gradient(90deg, var(--brand-grad-start), var(--brand-grad-end));
+  --brand-glow: 0 8px 28px rgba(140, 108, 255, 0.35);
 }
 
 a {
@@ -77,3 +85,82 @@ button:focus-visible {
 }
 
 /* media-based default no longer needed; explicit toggle via data-theme controls */
+
+/* Brand gradient utilities */
+.brand-text-gradient {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brand-btn {
+  background-image: var(--brand-gradient);
+  color: #fff !important;
+  border: none;
+  box-shadow: var(--brand-glow);
+}
+.brand-btn:hover {
+  filter: brightness(1.02);
+}
+.brand-btn:disabled {
+  filter: grayscale(20%);
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+/* Frosted translucent cards (helps iOS show background logo) */
+.frost-card {
+  background-color: var(--card-bg) !important;
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  backdrop-filter: saturate(140%) blur(10px);
+  transform: translateZ(0);
+}
+
+.frost-header {
+  background-color: rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: saturate(140%) blur(8px);
+  backdrop-filter: saturate(140%) blur(8px);
+}
+:root[data-theme='dark'] .frost-header {
+  background-color: rgba(36, 36, 36, 0.2);
+}
+
+/* Soft gradient background blobs for extra flair */
+.bg-blob, .bg-blob-2 {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(24px);
+  opacity: 0.22;
+}
+.bg-blob {
+  width: 360px;
+  height: 360px;
+  top: 24px;
+  right: 24px;
+  background: radial-gradient(circle at 30% 30%, var(--brand-grad-start), transparent 60%);
+}
+.bg-blob-2 {
+  width: 320px;
+  height: 320px;
+  bottom: 24px;
+  left: 24px;
+  background: radial-gradient(circle at 70% 70%, var(--brand-grad-end), transparent 60%);
+}
+
+@media (max-width: 480px) {
+  .bg-blob {
+    width: 260px;
+    height: 260px;
+    top: 12px;
+    right: 12px;
+  }
+  .bg-blob-2 {
+    width: 220px;
+    height: 220px;
+    bottom: 12px;
+    left: 12px;
+  }
+}

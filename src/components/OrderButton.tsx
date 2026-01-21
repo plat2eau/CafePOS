@@ -23,7 +23,7 @@ export default function OrderButton() {
   const disabled = !tableId || items.length === 0
 
   return (
-    <Button mt={4} colorPalette="teal" onClick={placeOrder} disabled={disabled}>
+    <Button mt={4} onClick={placeOrder} disabled={disabled} className="brand-btn">
       Place Order
     </Button>
   )

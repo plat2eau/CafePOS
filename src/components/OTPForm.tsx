@@ -49,7 +49,7 @@ export default function OTPForm({ tableId, onVerified }: { tableId: number, onVe
           <Text color="red.500" mt={2} fontSize="sm">{error}</Text>
         )}
         <HStack mt={4}>
-          <Button type="submit" loading={loading} bg="var(--button-bg)" color="var(--button-fg)" flex={1}>
+          <Button type="submit" loading={loading} className="brand-btn" flex={1}>
             Verify
           </Button>
         </HStack>

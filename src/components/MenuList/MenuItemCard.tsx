@@ -15,7 +15,7 @@ export default function MenuItemCard({ item, onAdd }: { item: MenuItem, onAdd?: 
   }
 
   return (
-    <Box bg="var(--card-bg)" color="var(--fg)" borderWidth="1px" borderColor="var(--border)" borderRadius="md" p={3}>
+    <Box className="frost-card" bg="var(--card-bg)" color="var(--fg)" borderWidth="1px" borderColor="var(--border)" borderRadius="md" p={3}>
       <HStack justify="space-between" align="start">
           <VStack align="start" gap={1}>
             <Text fontWeight="medium">{item.name}</Text>
@@ -31,7 +31,7 @@ export default function MenuItemCard({ item, onAdd }: { item: MenuItem, onAdd?: 
         {qty > 0 ? (
           <QuantityStepper value={qty} onChange={handleChange} />
         ) : (
-          <Button size="sm" colorPalette="teal" onClick={() => onAdd?.(item.id)}>Add</Button>
+          <Button size="sm" className="brand-btn" onClick={() => onAdd?.(item.id)}>Add</Button>
         )}
       </HStack>
     </Box>

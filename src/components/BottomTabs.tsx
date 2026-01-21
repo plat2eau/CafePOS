@@ -11,25 +11,27 @@ export default function BottomTabs() {
       <HStack p={0} m={0} gap={0} justify="stretch" align="stretch">
         <Button
           asChild
-          variant={isOrders ? 'ghost' : 'solid'}
+          variant="ghost"
           borderRadius={0}
           flex={1}
           py={3}
-          bg={isOrders ? 'transparent' : 'var(--button-bg)'}
-          color={isOrders ? 'var(--fg)' : 'var(--button-fg)'}
-          _hover={{ bg: isOrders ? 'transparent' : 'var(--button-bg)' }}
+          className={!isOrders ? 'brand-btn' : undefined}
+          bg={isOrders ? 'transparent' : undefined}
+          color={isOrders ? 'var(--fg)' : undefined}
+          _hover={{ bg: isOrders ? 'transparent' : undefined }}
         >
           <Link to={`/table/${tableId}`} style={{ color: 'inherit', textDecoration: 'none' }}>Menu</Link>
         </Button>
         <Button
           asChild
-          variant={isOrders ? 'solid' : 'ghost'}
+          variant="ghost"
           borderRadius={0}
           flex={1}
           py={3}
-          bg={isOrders ? 'var(--button-bg)' : 'transparent'}
-          color={isOrders ? 'var(--button-fg)' : 'var(--fg)'}
-          _hover={{ bg: isOrders ? 'var(--button-bg)' : 'transparent' }}
+          className={isOrders ? 'brand-btn' : undefined}
+          bg={isOrders ? undefined : 'transparent'}
+          color={isOrders ? undefined : 'var(--fg)'}
+          _hover={{ bg: isOrders ? undefined : 'transparent' }}
         >
           <Link to={`/table/${tableId}/orders`} style={{ color: 'inherit', textDecoration: 'none' }}>Orders</Link>
         </Button>
