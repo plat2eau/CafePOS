@@ -5,7 +5,7 @@ import { useTableId } from './hooks/useTableId'
 import { useMenu } from './hooks/useMenu'
 import MenuList from './components/MenuList/MenuList'
 import BottomActionBar from './components/BottomActionBar'
-import OTPForm from './components/OTPForm'
+import GuestForm from './components/GuestForm'
 import { getSession, isExpired } from './utils/tableSession'
 import { useState } from 'react'
 import { BRAND } from './config/brand'
@@ -28,7 +28,7 @@ export default function App() {
           void verifiedTick
           const sess = getSession(tableId)
           if (!sess || isExpired(sess)) {
-            return <OTPForm tableId={tableId} onVerified={() => setVerifiedTick((t) => t + 1)} />
+            return <GuestForm tableId={tableId} onVerified={() => setVerifiedTick((t) => t + 1)} />
           }
           return (
             <>

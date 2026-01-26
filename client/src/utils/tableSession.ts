@@ -1,4 +1,4 @@
-export type TableSession = { token: string; tableId: number; expiresAt: string }
+export type TableSession = { name: string; phone: string; tableId: number; expiresAt: string }
 
 const keyFor = (tableId: number) => `table_sess_${tableId}`
 

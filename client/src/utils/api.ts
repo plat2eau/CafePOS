@@ -1,14 +1,9 @@
-import { getSession } from './tableSession'
 
 export async function fetchJson(
   input: RequestInfo | URL,
   init: RequestInit & { tableId?: number } = {}
 ) {
   const headers = new Headers(init.headers || {})
-  if (init.tableId) {
-    const sess = getSession(init.tableId)
-    if (sess) headers.set('X-Table-Session', sess.token)
-  }
   headers.set('Content-Type', 'application/json')
   const res = await fetch(input, { ...init, headers })
   if (!res.ok) {
@@ -20,12 +15,6 @@ export async function fetchJson(
       body = undefined
     }
     const code = body?.error?.code
-    if (code === 'invalid_table_session' && init.tableId) {
-      const err = new Error('invalid_table_session') as Error & { code?: string; status?: number }
-      err.code = code
-      err.status = res.status
-      throw err
-    }
     const err = new Error(body?.error?.message || `HTTP ${res.status}`) as Error & { code?: string; status?: number }
     err.code = code
     err.status = res.status
