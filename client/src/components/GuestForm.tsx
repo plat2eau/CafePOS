@@ -1,5 +1,6 @@
 import { Box, Button, Input, Text, VStack } from '@chakra-ui/react'
 import { useState } from 'react'
+import { fetchJson } from '../utils/api'
 import { setSession } from '../utils/tableSession'
 
 export default function GuestForm({ tableId, onVerified }: { tableId: number, onVerified: () => void }) {
@@ -22,14 +23,14 @@ export default function GuestForm({ tableId, onVerified }: { tableId: number, on
     }
     setLoading(true)
     try {
-      // Mock submission
-      await new Promise((r) => setTimeout(r, 250))
-      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
-      setSession({ name, phone: cleanPhone, tableId, expiresAt })
+      const res = await fetchJson(`/api/v1/tables/${tableId}/guest/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ name, phone: cleanPhone })
+      })
+      setSession({ name, phone: cleanPhone, tableId, expiresAt: res.expiresAt, token: res.token })
       onVerified()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Submission failed'
-      setError(msg)
+      setError((err as Error).message || 'Submission failed')
     } finally {
       setLoading(false)
     }

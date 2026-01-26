@@ -1,7 +1,7 @@
 # CafePOS Repository Context
 
 ## Overview
-CafePOS is a monorepo containing a React-based client for table-side ordering and a placeholder service folder for a future backend. The current implementation focuses on a mobile-friendly, table-scoped ordering flow with guest information (name and phone number) access per table.
+CafePOS is a monorepo containing a React-based client for table-side ordering and a Fastify backend service for handling API requests. The client is mobile-friendly with a table-scoped ordering flow, guest information per table, and now integrates with the backend for verification, menu, and orders.
 
 ## Repository Layout
 - .gitignore
@@ -10,7 +10,7 @@ CafePOS is a monorepo containing a React-based client for table-side ordering an
 - package.json (npm workspaces configuration)
 - README.md
 - client/ (React + Vite + TypeScript frontend)
-  - eslint.config.js, index.html, package.json, PLAN.md, tsconfig files, vite.config.ts
+  - eslint.config.js, index.html, package.json, tsconfig files, vite.config.ts
   - public/ (vite.svg)
   - src/ (App.css, App.tsx, index.css, main.tsx)
     - assets/ (logo.png, logo.webp, react.svg)
@@ -19,92 +19,66 @@ CafePOS is a monorepo containing a React-based client for table-side ordering an
       - MenuList/ (MenuItemCard.tsx, MenuList.tsx)
     - config/ (brand.ts)
     - hooks/ (useMenu.ts, useTableId.ts)
-    - mock/ (menu.json)
+    - mock/ (menu.json) - Legacy, now uses backend
     - routes/ (NotFound.tsx, OrdersPage.tsx)
     - state/ (cartStore.ts)
     - types/ (menu.ts)
     - utils/ (api.ts, tableSession.ts)
-- service/ (Backend placeholder)
-  - package.json, plan.md
-  - data/, src/, lib/, plugins/, routes/
+- service/ (Fastify + TypeScript backend)
+  - package.json, tsconfig.json
+  - data/ (menu.json)
+  - src/ (server.ts)
+    - plugins/ (auth.ts, cors.ts)
+    - routes/ (guest.ts, menu.ts, orders.ts)
 
 ## How to Run
 - Install: npm install
-- Dev: npm run dev -w client (opens http://localhost:5173)
-- Start (host): npm run start -w client
+- Dev client: npm run dev -w client (http://localhost:5173)
+- Dev service: npm run dev -w service (http://localhost:3001)
 - Build: npm run -ws build
+- Start client: npm run start -w client
+- Start service: npm run start -w service
 - Lint: npm run -ws lint
-- Preview: npm run preview -w client
+- Preview client: npm run preview -w client
+- Test: Visit http://localhost:5173/table/1
 
 ## Client App
-- Stack: React 19, Vite 7, TypeScript 5.9, Chakra UI (v3 system tokens: ChakraProvider defaultSystem), React Router 7, Zustand 5.
-- Entry: client/src/main.tsx
-  - Initializes theme from localStorage (data-theme on <html>)
-  - Sets BRAND-based favicon/title
-  - Router:
-    - / → redirect to /table/1
-    - /table/:tableId → App (menu and guest info gating)
-    - /table/:tableId/orders → OrdersPage (requires active table session)
-    - * → NotFound
-
-### Routing and Pages
-- App.tsx: export default function App() { ... } – Shows TableHeader and BottomTabs; gates with GuestForm or renders MenuList.
-- OrdersPage.tsx: Lists mock past orders; redirects if session invalid.
-- NotFound.tsx: Basic 404 page.
-
-### Table Session and Guest Info
-- tableSession.ts: Functions for getSession(tableId), setSession, clearSession, isExpired; uses localStorage key `table_sess_{tableId}`.
-- GuestForm.tsx: export default function GuestForm({ tableId, onVerified }: { tableId: number, onVerified: () => void }) { ... } – Collects name and phone (limited to 10 numeric characters); sets session with 2h expiry on submission.
-- Gating: App checks session; OrdersPage uses Navigate redirect.
-
-### Menu Data
-- mock/menu.json: Sample menu items.
-- useMenu.ts: Hook simulates fetch with 500ms delay.
-- menu.ts: Type definitions for menu items.
-
-### State Management
-- cartStore.ts: Zustand store with items (Record by itemId), orderNote; actions: addItem, increment, decrement, setQty, remove, clear, reset; selectors: getList, subtotalCents.
-
-### UI Components
-- TableHeader.tsx: export default function TableHeader({ tableId }: { tableId: number | null }) { ... }
-- BottomTabs.tsx: export default function BottomTabs() { ... }
-- BottomActionBar.tsx: export default function BottomActionBar() { ... } – Shows selection details and order note.
-- MenuList.tsx / MenuItemCard.tsx: Display menu items.
-- CartSummary.tsx / QuantityStepper.tsx: Cart management.
-- OrderButton.tsx: export default function OrderButton() { ... } – Stub for placing orders.
-- ThemeToggle.tsx: export default function ThemeToggle() { ... } – Toggles light/dark mode, persists to localStorage.
-
-### Theming
-- index.css: CSS variables for light/dark modes.
-- ThemeToggle persists data-theme to <html> and localStorage.
-
-### API Wrapper
-- api.ts: fetchJson attaches X-Table-Session header; handles errors like 'invalid_table_session'.
-
-### Branding Config
-- brand.ts: Exports BRAND { name, logoUrl }; used for title and favicon.
+- Stack: React 19, Vite 7, TypeScript 5.9, Chakra UI, React Router 7, Zustand 5.
+- Entry: client/src/main.tsx (ChakraProvider, RouterProvider)
+  - Initializes theme from localStorage
+  - Sets BRAND favicon/title
+  - Router: / → /table/1, /table/:tableId → App, /table/:tableId/orders → OrdersPage, * → NotFound
+- App.tsx: Gates with GuestForm or renders MenuList (fetches menu post-verification)
+- OrdersPage.tsx: Fetches and lists orders from backend
+- GuestForm.tsx: Submits name/phone to backend for JWT token
+- useMenu.ts: Fetches menu from backend
+- OrderButton.tsx: Posts cart to backend orders endpoint
 
 ## Backend (service/)
-- Current: Placeholder with package.json and empty directories (data/, src/, lib/, plugins/, routes/).
-- Planned Endpoints:
-  - POST /api/v1/tables/:tableId/guest/verify → { token, expiresAt }
-  - GET /api/v1/menu → menu payload
-  - POST /api/v1/orders → create order
-  - GET /api/v1/tables/:tableId/orders → list orders
-- Auth: Validate X-Table-Session header.
+- Stack: Fastify 5, TypeScript 5, Zod, Jose (JWT), in-memory storage.
+- Entry: service/src/server.ts
+  - Plugins: CORS, sensible, auth (JWT validation)
+  - Routes: guest (verify for token), menu (public), orders (create/list with auth)
+- Endpoints:
+  - POST /api/v1/tables/:tableId/guest/verify {name, phone} → {token, expiresAt}
+  - GET /api/v1/menu → menu payload from data/menu.json
+  - POST /api/v1/orders {items, note?} (auth) → order with computed total
+  - GET /api/v1/tables/:tableId/orders (auth) → list orders
+- Auth: X-Table-Session JWT, validates tableId match
+- Data: menu.json, orders in-memory (add DB for persistence)
 
 ## Key Insights for Development
-- Monorepo enables shared deps; use npm workspaces.
-- Session management is client-side with mocks; integrate backend for real auth.
-- State is lightweight with Zustand; extend for more features.
-- UI built with Chakra UI; consistent theming.
-- Hooks like useMenu and useTableId centralize logic.
-- For new features: Use existing routes, state, and components as building blocks. E.g., add to cartStore for new state, extend api.ts for new endpoints.
+- Monorepo with workspaces for shared deps.
+- Client uses backend APIs; remove mocks when stable.
+- Session with token stored in localStorage.
+- UI with Chakra UI, theming persists.
+- Hooks centralize logic (useMenu, useTableId).
+- For extensions: Add DB (e.g., SQLite) in service/lib, more endpoints, error handling.
 
 ## Next Steps
-- Implement backend with real endpoints.
-- Replace mocks in client with API calls (e.g., guest info submission, menu fetch).
-- Add route guards, error boundaries, and loading states.
-- Refactor for better separation (e.g., AppLayout with Outlet).
+- Add persistence (SQLite/Postgres) for orders.
+- Implement production auth/secrets.
+- Add loading states, error boundaries in client.
+- Deploy: Client static, service Node server.
 
-This context provides a solid foundation for adding/editing features, with details on structure, APIs, and code entry points.
+This context provides a foundation for further development.

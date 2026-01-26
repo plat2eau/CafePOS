@@ -1,6 +1,7 @@
 import { Button } from '@chakra-ui/react'
 import { useCart } from '../state/cartStore'
 import { useTableId } from '../hooks/useTableId'
+import { fetchJson } from '../utils/api'
 
 export default function OrderButton() {
   const tableId = useTableId()
@@ -9,17 +10,25 @@ export default function OrderButton() {
   const clear = useCart(s => s.clear)
   const orderNote = useCart(s => s.orderNote)
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
     if (!tableId) return
-    const order = {
-      tableId,
-      items: items.map(i => ({ itemId: i.itemId, name: i.name, priceCents: i.priceCents, qty: i.qty })),
-      createdAt: new Date().toISOString(),
-      note: orderNote || undefined,
+    try {
+      const payload = {
+        items: items.map(i => ({ itemId: i.itemId, qty: i.qty })),
+        note: orderNote || undefined
+      }
+      const res = await fetchJson('/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        tableId
+      })
+      console.log('Order created:', res)
+      alert('Order placed!')
+      clear()
+    } catch (err) {
+      console.error(err)
+      alert('Failed to place order')
     }
-    console.log('OrderDraft:', order)
-    alert('Order placed! Check console for payload.')
-    clear()
   }
 
   const disabled = !tableId || items.length === 0
