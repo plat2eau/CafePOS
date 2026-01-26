@@ -72,7 +72,7 @@ export default function BottomActionBar() {
       )}
 
       <HStack mt={3} gap={3}>
-        <Button variant="ghost" flex={1} onClick={clear} disabled={items.length === 0}>
+        <Button variant="ghost" onClick={clear} disabled={items.length === 0}>
           Clear
         </Button>
         <OrderButton />

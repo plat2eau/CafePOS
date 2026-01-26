@@ -56,7 +56,7 @@ const placeOrder = async () => {
   const disabled = !tableId || items.length === 0
 
 return (
-  <Button mt={4} onClick={placeOrder} disabled={disabled} loading={isLoading} className="brand-btn">
+  <Button onClick={placeOrder} flex={1} disabled={disabled} loading={isLoading} className="brand-btn">
     Place Order
   </Button>
 )
