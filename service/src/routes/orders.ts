@@ -9,7 +9,7 @@ const orders: Array<{ id: string; tableId: number; createdAt: string; totalCents
 const itemMap = new Map(menuData.items.map(i => [i.id, i]))
 
 const ordersRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.post('/orders', async (req, reply) => {
+  fastify.post('/orders', { preHandler: fastify.authenticate }, async (req, reply) => {
     const schema = z.object({
       items: z.array(z.object({ itemId: z.string(), qty: z.number().int().min(1) })),
       note: z.string().optional()
@@ -36,7 +36,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
     return order
   })
 
-  fastify.get('/tables/:tableId/orders', async (req) => {
+  fastify.get('/tables/:tableId/orders', { preHandler: fastify.authenticate }, async (req) => {
     const tableId = Number((req.params as { tableId: string }).tableId)
     return orders.filter(o => o.tableId === tableId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   })

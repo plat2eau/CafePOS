@@ -1,9 +1,13 @@
 import { FastifyPluginAsync, preHandlerHookHandler } from 'fastify'
+import fp from 'fastify-plugin'
 import { jwtVerify } from 'jose'
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret-change-me')
 
 declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: preHandlerHookHandler
+  }
   interface FastifyRequest {
     user?: { tableId: number; name: string; phone: string; exp: number }
   }
@@ -29,7 +33,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   }
 
   fastify.decorateRequest('user', undefined)
-  fastify.addHook('preHandler', authHook) // Apply globally; override with { preHandler: [] } if needed
+  fastify.decorate('authenticate', authHook)
 }
 
-export default authPlugin
+export default fp(authPlugin, { name: 'auth' })

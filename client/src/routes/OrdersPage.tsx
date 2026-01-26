@@ -1,4 +1,5 @@
-import { Box, Heading, Text, VStack, HStack, Image } from '@chakra-ui/react'
+import { Box, Heading, Text, VStack, HStack, Image, IconButton } from '@chakra-ui/react'
+import { useToast } from '@chakra-ui/toast'
 import { useNavigate } from 'react-router-dom'
 import TableHeader from '../components/TableHeader'
 import BottomTabs from '../components/BottomTabs'
@@ -8,9 +9,8 @@ import { BRAND } from '../config/brand'
 import { fetchJson } from '../utils/api'
 import { useEffect, useState } from 'react'
 
-// types
- type OrderItem = { name: string; qty: number }
- type Order = { id: string; tableId: number; createdAt: string; totalCents: number; items: OrderItem[]; note?: string }
+import type { Order } from '../types/order'
+
 
 const toPrice = (c: number) => `₹${(c/100).toFixed(2)}`
 
@@ -18,21 +18,37 @@ export default function OrdersPage() {
   const tableIdNum = useTableId()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const toast = useToast()
 
-  useEffect(() => {
+  const fetchOrders = async () => {
     if (!tableIdNum) return
     const sess = getSession(tableIdNum)
     if (!sess || isExpired(sess)) {
       navigate(`/table/${tableIdNum}`, { replace: true })
       return
     }
-    fetchJson(`/api/v1/tables/${tableIdNum}/orders`, { tableId: tableIdNum })
-      .then(data => {
-        setOrders(data as Order[])
-        setIsLoading(false)
-      })
-      .catch(() => setIsLoading(false))
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await fetchJson(`/api/v1/tables/${tableIdNum}/orders`, { tableId: tableIdNum })
+      setOrders(data as Order[])
+    } catch (err: unknown) {
+      const error = err as { status?: number }
+      if (error.status === 401 || error.status === 403) {
+        toast({ title: 'Session Expired', description: 'Please verify again.', status: 'warning', duration: 5000, isClosable: true })
+        navigate(`/table/${tableIdNum}`)
+      } else {
+        setError('Failed to load orders. Please try again.')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchOrders()
   }, [tableIdNum, navigate])
 
   return (
@@ -42,8 +58,13 @@ export default function OrdersPage() {
       <Box className="bg-blob-2" />
       <TableHeader tableId={tableIdNum} />
       <Box p={4} flex="1" minH={0} overflowY="auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <Heading size="md" mb={3}>Past Orders</Heading>
-        {isLoading ? <Text>Loading...</Text> : orders.length === 0 ? <Text color="fg.muted">No past orders</Text> : (
+        <HStack justify="space-between" align="center" mb={3}>
+          <Heading size="md">Past Orders</Heading>
+          <IconButton aria-label="Refresh" variant="ghost" size="sm" onClick={fetchOrders} disabled={isLoading} >
+            ↻
+          </IconButton>
+        </HStack>
+        {error ? <Text color="red.500">{error}</Text> : isLoading ? <Text>Loading...</Text> : orders.length === 0 ? <Text color="fg.muted">No past orders</Text> : (
           <VStack align="stretch" gap={3}>
             {orders.map(o => (
               <Box key={o.id} className="frost-card" borderWidth="1px" borderColor="var(--border)" bg="var(--card-bg)" borderRadius="md" p={3}>

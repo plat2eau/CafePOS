@@ -1,7 +1,7 @@
-import { Box, HStack, VStack, Text, Button, IconButton, Textarea } from '@chakra-ui/react'
+import { Box, Button, HStack, VStack, Text, IconButton, Textarea } from '@chakra-ui/react'
+import OrderButton from './OrderButton'
 import { useState } from 'react'
 import { useCart } from '../state/cartStore'
-import { useTableId } from '../hooks/useTableId'
 
 const toPrice = (cents: number) => `₹${(cents / 100).toFixed(2)}`
 
@@ -9,29 +9,14 @@ export default function BottomActionBar() {
   const itemsObj = useCart(s => s.items)
   const items = Object.values(itemsObj)
   const clear = useCart(s => s.clear)
-  const reset = useCart(s => s.reset)
   const orderNote = useCart(s => s.orderNote)
   const setOrderNote = useCart(s => s.setOrderNote)
-  const tableId = useTableId()
 
   const subtotal = items.reduce((sum, it) => sum + it.priceCents * it.qty, 0)
   const count = items.reduce((sum, it) => sum + it.qty, 0)
 
   const [open, setOpen] = useState(false)
   const [showNote, setShowNote] = useState(false)
-
-  const placeOrder = () => {
-    if (!tableId || items.length === 0) return
-    const order = {
-      tableId,
-      items: items.map(i => ({ itemId: i.itemId, name: i.name, priceCents: i.priceCents, qty: i.qty })),
-      createdAt: new Date().toISOString(),
-      note: orderNote || undefined,
-    }
-    console.log('OrderDraft:', order)
-    alert('Order placed! Check console for payload.')
-    reset()
-  }
 
   return (
     <Box borderTopWidth="1px" borderColor="var(--border)" bg="var(--bg)" color="var(--fg)" px={3} py={2}>
@@ -90,9 +75,7 @@ export default function BottomActionBar() {
         <Button variant="ghost" flex={1} onClick={clear} disabled={items.length === 0}>
           Clear
         </Button>
-        <Button flex={2} onClick={placeOrder} disabled={!tableId || items.length === 0} className="brand-btn">
-          Place Order
-        </Button>
+        <OrderButton />
       </HStack>
     </Box>
   )

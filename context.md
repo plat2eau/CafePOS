@@ -53,19 +53,26 @@ CafePOS is a monorepo containing a React-based client for table-side ordering an
 - GuestForm.tsx: Submits name/phone to backend for JWT token
 - useMenu.ts: Fetches menu from backend
 - OrderButton.tsx: Posts cart to backend orders endpoint
+- types/order.ts: Defines Order and OrderItem types matching backend response
 
 ## Backend (service/)
 - Stack: Fastify 5, TypeScript 5, Zod, Jose (JWT), in-memory storage.
 - Entry: service/src/server.ts
-  - Plugins: CORS, sensible, auth (JWT validation)
+  - Plugins: CORS, sensible, auth (JWT validation, per-route via fastify.authenticate)
   - Routes: guest (verify for token), menu (public), orders (create/list with auth)
 - Endpoints:
   - POST /api/v1/tables/:tableId/guest/verify {name, phone} → {token, expiresAt}
   - GET /api/v1/menu → menu payload from data/menu.json
   - POST /api/v1/orders {items, note?} (auth) → order with computed total
   - GET /api/v1/tables/:tableId/orders (auth) → list orders
-- Auth: X-Table-Session JWT, validates tableId match
+- Auth: X-Table-Session JWT header for protected routes, validates tableId match
 - Data: menu.json, orders in-memory (add DB for persistence)
+
+## Debugging
+- VS Code launch configs in .vscode/launch.json for backend:
+  - Service: Launch (tsx) - Run src/server.ts without watch
+  - Service: Launch Watch (tsx) - Run with tsx watch for hot-reload
+  - Service: Attach - Attach to running process (start with NODE_OPTIONS=--inspect npm run dev -w service)
 
 ## Key Insights for Development
 - Monorepo with workspaces for shared deps.
