@@ -7,7 +7,7 @@ import { useTableId } from '../hooks/useTableId'
 import { getSession, isExpired } from '../utils/tableSession'
 import { BRAND } from '../config/brand'
 import { fetchJson } from '../utils/api'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import type { Order } from '../types/order'
 
@@ -22,7 +22,7 @@ export default function OrdersPage() {
   const navigate = useNavigate()
   const toast = useToast()
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     if (!tableIdNum) return
     const sess = getSession(tableIdNum)
     if (!sess || isExpired(sess)) {
@@ -45,11 +45,11 @@ export default function OrdersPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [navigate, tableIdNum, toast])
 
   useEffect(() => {
     fetchOrders()
-  }, [tableIdNum, navigate])
+  }, [tableIdNum, navigate, fetchOrders])
 
   return (
     <Box maxW="480px" mx="auto" h="100dvh" display="flex" flexDir="column" bg={{ base: 'transparent' }} position="relative" overflow="hidden">
