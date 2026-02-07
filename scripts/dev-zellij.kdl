@@ -1,0 +1,12 @@
+layout {
+  pane split_direction="vertical" {
+    pane name="service" cwd="service" {
+      command "npm"
+      args "run" "dev"
+    }
+    pane name="client" cwd="client" {
+      command "npm"
+      args "run" "dev"
+    }
+  }
+}
