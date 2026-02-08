@@ -7,14 +7,12 @@ import NotFound from './routes/NotFound.tsx'
 import OrdersPage from './routes/OrdersPage.tsx'
 import { BRAND } from './config/brand'
 
-// Initialize theme from localStorage (default: light)
+// Initialize theme from localStorage or system preference
 const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
-if (!storedTheme) {
-  localStorage.setItem('theme', 'light')
-  document.documentElement.dataset.theme = 'light'
-} else {
-  document.documentElement.dataset.theme = storedTheme
-}
+const systemPrefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+const initialTheme: 'light' | 'dark' = storedTheme ?? (systemPrefersDark ? 'dark' : 'light')
+localStorage.setItem('theme', initialTheme)
+document.documentElement.dataset.theme = initialTheme
 
 // Branding: Set page title and favicon to cafe brand
 document.title = BRAND.name

@@ -24,7 +24,7 @@ function VerifiedMenu() {
           ))}
         </VStack>
       )}
-      {error && <Text color="red.500">Failed to load menu</Text>}
+        {error && <Text color="var(--error)">Failed to load menu</Text>}
       {data && <MenuList data={data} />}
     </>
   )
@@ -41,7 +41,7 @@ export default function App() {
       <TableHeader tableId={tableId} />
       <Box p={4} flex="1" minH={0} overflowY="auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         {!tableId && (
-          <Text color="red.500">Invalid or missing table number</Text>
+          <Text color="var(--error)">Invalid or missing table number</Text>
         )}
         {tableId && (() => {
           void verifiedTick

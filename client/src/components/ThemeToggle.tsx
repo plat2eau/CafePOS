@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 
 export default function ThemeToggle() {
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
-    const m = (localStorage.getItem('theme') as 'light' | 'dark' | null) ?? 'light'
-    return m
+    const stored = localStorage.getItem('theme') as 'light' | 'dark' | null
+    const systemPrefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    return stored ?? (systemPrefersDark ? 'dark' : 'light')
   })
 
   useEffect(() => {
@@ -15,8 +16,8 @@ export default function ThemeToggle() {
   const toggle = () => setMode(prev => (prev === 'light' ? 'dark' : 'light'))
 
   const isLight = mode === 'light'
-  const icon = isLight ? '☀️' : '🌙'
-  const iconColor = isLight ? '#f6c343' : '#cbd5e1'
+  const icon = isLight ? '☀' : '🌙'
+  const iconColor = isLight ? 'var(--primary)' : 'var(--fg-muted)'
 
   return (
     <IconButton

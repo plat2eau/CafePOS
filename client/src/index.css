@@ -3,19 +3,32 @@
   line-height: 1.5;
   font-weight: 400;
 
-  /* Light defaults */
-  --bg: #ffffff;
-  --fg: #213547;
-  --link: #3b5bdb;
-  --link-hover: #364fc7;
-  --button-bg: #f1f3f5;
-  --button-fg: #212529;
-  --card-bg: rgba(255, 255, 255, 0.88);
-  --border: #e5e7eb;
-  --brand-grad-start: #ff7a59;
-  --brand-grad-end: #7b5cff;
-  --brand-gradient: linear-gradient(90deg, var(--brand-grad-start), var(--brand-grad-end));
-  --brand-glow: 0 8px 24px rgba(123, 92, 255, 0.25);
+  /* Cheekoo's Light Mode */
+  --bg: #F6F4EF;
+  --surface: #EFEDE6;
+  --fg: #2E2E2E;
+  --fg-muted: rgba(46, 46, 46, 0.72);
+  --border: rgba(46, 46, 46, 0.14);
+
+  --primary: #6B7F3F;
+  --primary-fg: #F6F4EF;
+  --accent: #8B5E3C;
+
+  --success: #8FAF6A;
+  --warning: #C9A24D;
+  --error: #B5523B;
+
+  --link: var(--primary);
+  --link-hover: #5F7238;
+
+  --button-bg: transparent;
+  --button-fg: var(--fg);
+  --card-bg: var(--surface);
+
+  --brand-solid: var(--primary);
+  --brand-solid-hover: #5F7238;
+  --brand-solid-active: #556833;
+  --brand-glow: none;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,18 +38,32 @@
 
 /* Dark theme overrides */
 :root[data-theme='dark'] {
-  --bg: #242424;
-  --fg: rgba(255, 255, 255, 0.87);
-  --link: #747bff;
-  --link-hover: #646cff;
-  --button-bg: #1a1a1a;
-  --button-fg: #e9ecef;
-  --card-bg: rgba(42, 42, 42, 0.86);
-  --border: #2f3133;
-  --brand-grad-start: #ff8f70;
-  --brand-grad-end: #8c6cff;
-  --brand-gradient: linear-gradient(90deg, var(--brand-grad-start), var(--brand-grad-end));
-  --brand-glow: 0 8px 28px rgba(140, 108, 255, 0.35);
+  /* Cheekoo's Dark Mode */
+  --bg: #1E1F1C;
+  --surface: #2A2E26;
+  --fg: #E8E6DF;
+  --fg-muted: #B6B8B2;
+  --border: rgba(182, 184, 178, 0.18);
+
+  --primary: #7F9652;
+  --primary-fg: #1E1F1C;
+  --accent: #9C6B4A;
+
+  --success: #7FA36A;
+  --warning: #C3A55A;
+  --error: #C06A55;
+
+  --link: var(--primary);
+  --link-hover: #90A965;
+
+  --button-bg: transparent;
+  --button-fg: var(--fg);
+  --card-bg: var(--surface);
+
+  --brand-solid: var(--primary);
+  --brand-solid-hover: #90A965;
+  --brand-solid-active: #9AB173;
+  --brand-glow: none;
 }
 
 a {
@@ -70,10 +97,10 @@ button {
   background-color: var(--button-bg);
   color: var(--button-fg);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--primary);
 }
 
 hr, .divider, [data-border-top] {
@@ -86,22 +113,25 @@ button:focus-visible {
 
 /* media-based default no longer needed; explicit toggle via data-theme controls */
 
-/* Brand gradient utilities */
+/* Brand utilities (no gradients) */
 .brand-text-gradient {
-  background: var(--brand-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--primary);
 }
 
 .brand-btn {
-  background-image: var(--brand-gradient);
-  color: #fff !important;
-  border: none;
-  box-shadow: var(--brand-glow);
+  background: var(--primary);
+  color: var(--primary-fg) !important;
+  border: 1px solid var(--primary);
+  box-shadow: 0 6px 16px rgba(46, 46, 46, 0.10);
+}
+:root[data-theme='dark'] .brand-btn {
+  box-shadow: none;
 }
 .brand-btn:hover {
-  filter: brightness(1.02);
+  background: var(--brand-solid-hover);
+}
+.brand-btn:active {
+  background: var(--brand-solid-active);
 }
 .brand-btn:disabled {
   filter: grayscale(20%);
@@ -109,58 +139,23 @@ button:focus-visible {
   box-shadow: none;
 }
 
-/* Frosted translucent cards (helps iOS show background logo) */
+/* Cards */
 .frost-card {
-  background-color: var(--card-bg) !important;
-  -webkit-backdrop-filter: saturate(140%) blur(10px);
-  backdrop-filter: saturate(140%) blur(10px);
-  transform: translateZ(0);
+  background-color: var(--surface) !important;
+  box-shadow: 0 6px 18px rgba(46, 46, 46, 0.08);
+}
+:root[data-theme='dark'] .frost-card {
+  box-shadow: none;
 }
 
 .frost-header {
-  background-color: rgba(255, 255, 255, 0.12);
-  -webkit-backdrop-filter: saturate(140%) blur(8px);
-  backdrop-filter: saturate(140%) blur(8px);
+  background-color: var(--surface);
 }
 :root[data-theme='dark'] .frost-header {
-  background-color: rgba(36, 36, 36, 0.2);
+  background-color: var(--surface);
 }
 
-/* Soft gradient background blobs for extra flair */
+/* Disabled: gradients are not part of the cafe palette */
 .bg-blob, .bg-blob-2 {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-  filter: blur(24px);
-  opacity: 0.22;
-}
-.bg-blob {
-  width: 360px;
-  height: 360px;
-  top: 24px;
-  right: 24px;
-  background: radial-gradient(circle at 30% 30%, var(--brand-grad-start), transparent 60%);
-}
-.bg-blob-2 {
-  width: 320px;
-  height: 320px;
-  bottom: 24px;
-  left: 24px;
-  background: radial-gradient(circle at 70% 70%, var(--brand-grad-end), transparent 60%);
-}
-
-@media (max-width: 480px) {
-  .bg-blob {
-    width: 260px;
-    height: 260px;
-    top: 12px;
-    right: 12px;
-  }
-  .bg-blob-2 {
-    width: 220px;
-    height: 220px;
-    bottom: 12px;
-    left: 12px;
-  }
+  display: none;
 }

@@ -15,7 +15,7 @@ export default function CartSummary() {
     return (
       <Box mt={6}>
         <Heading size="sm" mb={2}>Your Order</Heading>
-        <Text color="fg.muted">No items yet</Text>
+        <Text color="var(--fg-muted)">No items yet</Text>
       </Box>
     )
   }
@@ -28,7 +28,7 @@ export default function CartSummary() {
           <HStack key={it.itemId} justify="space-between" align="center">
             <VStack align="start" gap={0}>
               <Text>{it.name}</Text>
-              <Text color="fg.muted" fontSize="sm">{toPrice(it.priceCents)}</Text>
+              <Text color="var(--fg-muted)" fontSize="sm">{toPrice(it.priceCents)}</Text>
             </VStack>
             <HStack gap={3}>
               <QuantityStepper value={it.qty} onChange={(q) => q === 0 ? remove(it.itemId) : setQty(it.itemId, q)} />

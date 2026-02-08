@@ -23,7 +23,7 @@ export default function BottomActionBar() {
       <HStack justify="space-between" align="center">
         <VStack align="start" gap={0}>
           <Text fontWeight="semibold">Your selection</Text>
-          <Text fontSize="sm" color="fg.muted">{count} item{count === 1 ? '' : 's'} • {toPrice(subtotal)}</Text>
+          <Text fontSize="sm" color="var(--fg-muted)">{count} item{count === 1 ? '' : 's'} • {toPrice(subtotal)}</Text>
         </VStack>
         <HStack gap={1}>
           {(items.length > 0) && (
@@ -40,7 +40,7 @@ export default function BottomActionBar() {
       {open && (
         <VStack align="stretch" gap={1} mt={2}>
           {items.length === 0 && (
-            <Text color="fg.muted" fontSize="sm">No items yet</Text>
+            <Text color="var(--fg-muted)" fontSize="sm">No items yet</Text>
           )}
           {items.map(it => (
             <HStack key={it.itemId} justify="space-between" align="center">
@@ -48,7 +48,7 @@ export default function BottomActionBar() {
                 <Text as="span" fontSize="sm">{it.name}</Text>
               </Box>
               <HStack gap={2}>
-                <Text fontSize="sm" color="fg.muted">{it.qty} × {toPrice(it.priceCents)}</Text>
+                <Text fontSize="sm" color="var(--fg-muted)">{it.qty} × {toPrice(it.priceCents)}</Text>
                 <Text fontSize="sm" fontWeight="semibold">{toPrice(it.priceCents * it.qty)}</Text>
               </HStack>
             </HStack>
@@ -66,7 +66,7 @@ export default function BottomActionBar() {
             autoFocus
           />
           <HStack justify="flex-end">
-            <Text fontSize="xs" color="fg.muted">{orderNote.length}/200</Text>
+            <Text fontSize="xs" color="var(--fg-muted)">{orderNote.length}/200</Text>
           </HStack>
         </VStack>
       )}

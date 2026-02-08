@@ -10,12 +10,12 @@ export default function TableHeader({ tableId }: { tableId: number | null }) {
         <Heading size="md" className="brand-text-gradient">{BRAND.name}</Heading>
       </HStack>
       <HStack gap={3}>
-        <Badge colorPalette="teal" size="lg">
+        <Badge bg="var(--surface)" color="var(--fg)" borderWidth="1px" borderColor="var(--border)" size="lg">
           Table {tableId ?? '?'}
         </Badge>
         <ThemeToggle />
       </HStack>
-      <Box position="absolute" bottom={0} left={0} right={0} height="2px" bg="var(--brand-gradient)" opacity={0.6} />
+      <Box position="absolute" bottom={0} left={0} right={0} height="2px" bg="var(--primary)" opacity={0.4} />
     </HStack>
   )
 }

@@ -64,7 +64,7 @@ export default function OrdersPage() {
             ↻
           </IconButton>
         </HStack>
-        {error ? <Text color="red.500">{error}</Text> : isLoading ? <Text>Loading...</Text> : orders.length === 0 ? <Text color="fg.muted">No past orders</Text> : (
+        {error ? <Text color="var(--error)">{error}</Text> : isLoading ? <Text>Loading...</Text> : orders.length === 0 ? <Text color="var(--fg-muted)">No past orders</Text> : (
           <VStack align="stretch" gap={3}>
             {orders.map(o => (
               <Box key={o.id} className="frost-card" borderWidth="1px" borderColor="var(--border)" bg="var(--card-bg)" borderRadius="md" p={3}>
@@ -79,7 +79,7 @@ export default function OrdersPage() {
                 </VStack>
                 {o.note && (
                   <Box mt={2}>
-                    <Text fontSize="sm" color="fg.muted">Note</Text>
+                    <Text fontSize="sm" color="var(--fg-muted)">Note</Text>
                     <Text fontSize="sm">{o.note}</Text>
                   </Box>
                 )}

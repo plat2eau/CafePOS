@@ -7,7 +7,7 @@ export default function BottomTabs() {
   const isOrders = pathname.endsWith('/orders')
 
   return (
-    <Box borderTopWidth="1px" borderColor="var(--border)" mt="auto" bg="var(--bg)" color="var(--fg)" boxShadow="0 -2px 8px rgba(0,0,0,0.06)">
+    <Box borderTopWidth="1px" borderColor="var(--border)" mt="auto" bg="var(--surface)" color="var(--fg)" boxShadow={{ base: '0 -2px 8px rgba(46,46,46,0.06)', _dark: 'none' }}>
       <HStack p={0} m={0} gap={0} justify="stretch" align="stretch">
         <Button
           asChild

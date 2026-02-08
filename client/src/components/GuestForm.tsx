@@ -61,12 +61,12 @@ export default function GuestForm({ tableId, onVerified }: { tableId: number, on
             />
           </Box>
           {error && (
-            <Text color="red.500" mt={2} fontSize="sm">{error}</Text>
+            <Text color="var(--error)" mt={2} fontSize="sm">{error}</Text>
           )}
           <Button type="submit" loading={loading} className="brand-btn" width="full">
             Submit
           </Button>
-          <Text color="fg.muted" fontSize="sm">We'll use this to identify your orders.</Text>
+          <Text color="var(--fg-muted)" fontSize="sm">We'll use this to identify your orders.</Text>
         </VStack>
       </form>
     </Box>
