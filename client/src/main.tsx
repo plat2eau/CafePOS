@@ -5,6 +5,10 @@ import './index.css'
 import App from './App.tsx'
 import NotFound from './routes/NotFound.tsx'
 import OrdersPage from './routes/OrdersPage.tsx'
+import AdminLoginPage from './routes/admin/AdminLoginPage.tsx'
+import AdminSessionsPage from './routes/admin/AdminSessionsPage.tsx'
+import AdminSessionDetailPage from './routes/admin/AdminSessionDetailPage.tsx'
+import AdminGuard from './routes/admin/AdminGuard.tsx'
 import { BRAND } from './config/brand'
 
 // Initialize theme from localStorage or system preference
@@ -35,6 +39,23 @@ const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/table/1" replace /> },
   { path: '/table/:tableId', element: <App /> },
   { path: '/table/:tableId/orders', element: <OrdersPage /> },
+  { path: '/admin/login', element: <AdminLoginPage /> },
+  {
+    path: '/admin/sessions',
+    element: (
+      <AdminGuard>
+        <AdminSessionsPage />
+      </AdminGuard>
+    )
+  },
+  {
+    path: '/admin/sessions/:tableId',
+    element: (
+      <AdminGuard>
+        <AdminSessionDetailPage />
+      </AdminGuard>
+    )
+  },
   { path: '*', element: <NotFound /> },
 ])
 

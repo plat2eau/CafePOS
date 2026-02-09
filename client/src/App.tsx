@@ -9,6 +9,7 @@ import { getSession, isExpired } from './utils/tableSession'
 import { useState } from 'react'
 import { BRAND } from './config/brand'
 import { useMenu } from './hooks/useMenu'
+import { useSessionHeartbeat } from './hooks/useSessionHeartbeat'
 
 function VerifiedMenu() {
   const { data, isLoading, error } = useMenu()
@@ -33,6 +34,8 @@ function VerifiedMenu() {
 export default function App() {
   const tableId = useTableId()
   const [verifiedTick, setVerifiedTick] = useState(0)
+
+  useSessionHeartbeat(tableId)
   return (
     <Box maxW="480px" mx="auto" h="100dvh" display="flex" flexDir="column" bg={{ base: 'transparent' }} position="relative" overflow="hidden">
       <Image src={BRAND.logoUrl} alt={BRAND.name} opacity={0.12} maxW="70%" maxH="70%" position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" pointerEvents="none" zIndex={0} objectFit="contain" style={{ WebkitTransform: 'translate(-50%, -50%)', willChange: 'transform, opacity' }} />

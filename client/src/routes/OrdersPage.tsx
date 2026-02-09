@@ -8,6 +8,7 @@ import { getSession, isExpired } from '../utils/tableSession'
 import { BRAND } from '../config/brand'
 import { fetchJson } from '../utils/api'
 import { useCallback, useEffect, useState } from 'react'
+import { useSessionHeartbeat } from '../hooks/useSessionHeartbeat'
 
 import type { Order } from '../types/order'
 
@@ -16,6 +17,7 @@ const toPrice = (c: number) => `₹${(c/100).toFixed(2)}`
 
 export default function OrdersPage() {
   const tableId = useTableId()
+  useSessionHeartbeat(tableId)
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

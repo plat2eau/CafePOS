@@ -1,12 +1,6 @@
 import { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
-import menuData from '../../data/menu.json'
-
-// In-memory store (replace with DB later)
-const orders: Array<{ id: string; tableId: string; sessionId?: string; createdAt: string; totalCents: number; items: Array<{ itemId: string; name: string; qty: number; priceCents: number }>; note?: string }> = []
-
-// Menu lookup
-const itemMap = new Map(menuData.items.map(i => [i.id, i]))
+// In-memory store lives on fastify.store
 
 const ordersRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/orders', { preHandler: fastify.authenticate }, async (req, reply) => {
@@ -18,7 +12,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
     const user = req.user!
     let totalCents = 0
     const orderItems = body.items.map(({ itemId, qty }) => {
-      const item = itemMap.get(itemId)
+      const item = fastify.store.itemMap.get(itemId)
       if (!item) throw fastify.httpErrors.badRequest(`Invalid itemId: ${itemId}`)
       const priceCents = item.priceCents
       totalCents += priceCents * qty
@@ -33,13 +27,17 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
       items: orderItems,
       note: body.note
     }
-    orders.push(order)
+    fastify.store.orders.push(order)
+    fastify.adminWs.broadcast({ type: 'order.created', order })
     return order
   })
 
   fastify.get('/tables/:tableId/orders', { preHandler: fastify.authenticate }, async (req) => {
     const tableId = (req.params as { tableId: string }).tableId
-    return orders.filter(o => o.tableId === tableId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    const sessionId = req.user?.sessionId
+    return fastify.store.orders
+      .filter(o => o.tableId === tableId && o.sessionId === sessionId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   })
 }
 

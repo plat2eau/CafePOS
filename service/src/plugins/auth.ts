@@ -27,6 +27,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       if (tableIdParam && req.user.tableId !== tableIdParam) {
         return reply.forbidden('Session table mismatch')
       }
+
+      const active = fastify.store.sessionsByTableId.get(req.user.tableId)
+      if (!active || active.sessionId !== req.user.sessionId) {
+        return reply.unauthorized('No active table session')
+      }
     } catch (err) {
       return reply.unauthorized('Invalid token')
     }
