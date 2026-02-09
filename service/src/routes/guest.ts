@@ -14,7 +14,7 @@ const guestRoutes: FastifyPluginAsync = async (fastify) => {
     })
     const body = schema.parse(req.body)
     const { tableId: tableIdStr } = req.params as { tableId: string }
-    const tableId = Number(tableIdStr)
+    const tableId = tableIdStr
     const exp = Math.floor(Date.now() / 1000) + 2 * 60 * 60 // 2h
     const payload = { ...body, tableId, exp }
     const token = await new SignJWT(payload)

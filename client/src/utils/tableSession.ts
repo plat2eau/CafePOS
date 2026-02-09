@@ -1,8 +1,8 @@
-export type TableSession = { name: string; phone: string; tableId: number; expiresAt: string; token: string }
+export type TableSession = { name: string; phone: string; tableId: string; expiresAt: string; token: string }
 
-const keyFor = (tableId: number) => `table_sess_${tableId}`
+const keyFor = (tableId: string) => `table_sess_${tableId}`
 
-export function getSession(tableId: number): TableSession | null {
+export function getSession(tableId: string): TableSession | null {
   try {
     const raw = localStorage.getItem(keyFor(tableId))
     if (!raw) return null
@@ -17,7 +17,7 @@ export function setSession(sess: TableSession) {
   localStorage.setItem(keyFor(sess.tableId), JSON.stringify(sess))
 }
 
-export function clearSession(tableId: number) {
+export function clearSession(tableId: string) {
   localStorage.removeItem(keyFor(tableId))
 }
 

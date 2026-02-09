@@ -2,7 +2,7 @@ import { Badge, HStack, Heading, Image, Box } from '@chakra-ui/react'
 import ThemeToggle from './ThemeToggle'
 import { BRAND } from '../config/brand'
 
-export default function TableHeader({ tableId }: { tableId: number | null }) {
+export default function TableHeader({ tableId }: { tableId: string | null }) {
   return (
     <HStack justifyContent="space-between" p={4} position="sticky" top={0} bg="transparent" className="frost-header" color="var(--fg)" borderBottomWidth="0" boxShadow="none" zIndex={5}>
       <HStack gap={2} align="center">

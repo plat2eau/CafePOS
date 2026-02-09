@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import corsPlugin from './plugins/cors'
 import sensible from '@fastify/sensible'
 import authPlugin from './plugins/auth'
+import websocket from '@fastify/websocket'
 import guestRoutes from './routes/guest'
 import menuRoutes from './routes/menu'
 import ordersRoutes from './routes/orders'
@@ -31,6 +32,7 @@ async function main() {
   await server.register(corsPlugin)
   await server.register(sensible)
   await server.register(authPlugin)
+  await server.register(websocket)
 
   // Routes
   await server.register(guestRoutes, { prefix: '/api/v1' })

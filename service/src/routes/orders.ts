@@ -3,7 +3,7 @@ import { z } from 'zod'
 import menuData from '../../data/menu.json'
 
 // In-memory store (replace with DB later)
-const orders: Array<{ id: string; tableId: number; createdAt: string; totalCents: number; items: Array<{ itemId: string; name: string; qty: number; priceCents: number }>; note?: string }> = []
+const orders: Array<{ id: string; tableId: string; sessionId?: string; createdAt: string; totalCents: number; items: Array<{ itemId: string; name: string; qty: number; priceCents: number }>; note?: string }> = []
 
 // Menu lookup
 const itemMap = new Map(menuData.items.map(i => [i.id, i]))
@@ -27,6 +27,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
     const order = {
       id: Date.now().toString(),
       tableId: user.tableId,
+      sessionId: user.sessionId,
       createdAt: new Date().toISOString(),
       totalCents,
       items: orderItems,
@@ -37,7 +38,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   fastify.get('/tables/:tableId/orders', { preHandler: fastify.authenticate }, async (req) => {
-    const tableId = Number((req.params as { tableId: string }).tableId)
+    const tableId = (req.params as { tableId: string }).tableId
     return orders.filter(o => o.tableId === tableId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   })
 }

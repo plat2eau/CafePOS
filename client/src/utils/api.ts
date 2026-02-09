@@ -5,7 +5,7 @@ const API_BASE = 'http://localhost:3001'
 
 export async function fetchJson(
   input: RequestInfo | URL,
-  init: RequestInit & { tableId?: number } = {}
+  init: RequestInit & { tableId?: string } = {}
 ) {
   let url = input
   if (typeof url === 'string' && url.startsWith('/')) {

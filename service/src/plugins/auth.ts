@@ -9,7 +9,7 @@ declare module 'fastify' {
     authenticate: preHandlerHookHandler
   }
   interface FastifyRequest {
-    user?: { tableId: number; name: string; phone: string; exp: number }
+    user?: { tableId: string; name: string; phone: string; exp: number; sessionId?: string }
   }
 }
 
@@ -21,10 +21,10 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
     try {
       const { payload } = await jwtVerify(token, SECRET, { algorithms: ['HS256'] })
-      req.user = payload as { tableId: number; name: string; phone: string; exp: number }
+      req.user = payload as { tableId: string; name: string; phone: string; exp: number; sessionId?: string }
       // Validate tableId matches route if applicable
       const tableIdParam = (req.params as { tableId?: string })?.tableId
-      if (tableIdParam && req.user.tableId !== Number(tableIdParam)) {
+      if (tableIdParam && req.user.tableId !== tableIdParam) {
         return reply.forbidden('Session table mismatch')
       }
     } catch (err) {

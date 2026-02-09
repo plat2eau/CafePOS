@@ -15,7 +15,7 @@ import type { Order } from '../types/order'
 const toPrice = (c: number) => `₹${(c/100).toFixed(2)}`
 
 export default function OrdersPage() {
-  const tableIdNum = useTableId()
+  const tableId = useTableId()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -23,40 +23,40 @@ export default function OrdersPage() {
   const toast = useToast()
 
   const fetchOrders = useCallback(async () => {
-    if (!tableIdNum) return
-    const sess = getSession(tableIdNum)
+    if (!tableId) return
+    const sess = getSession(tableId)
     if (!sess || isExpired(sess)) {
-      navigate(`/table/${tableIdNum}`, { replace: true })
+      navigate(`/table/${tableId}`, { replace: true })
       return
     }
     setIsLoading(true)
     setError(null)
     try {
-      const data = await fetchJson(`/api/v1/tables/${tableIdNum}/orders`, { tableId: tableIdNum })
+      const data = await fetchJson(`/api/v1/tables/${tableId}/orders`, { tableId })
       setOrders(data as Order[])
     } catch (err: unknown) {
       const error = err as { status?: number }
       if (error.status === 401 || error.status === 403) {
         toast({ title: 'Session Expired', description: 'Please verify again.', status: 'warning', duration: 5000, isClosable: true })
-        navigate(`/table/${tableIdNum}`)
+        navigate(`/table/${tableId}`)
       } else {
         setError('Failed to load orders. Please try again.')
       }
     } finally {
       setIsLoading(false)
     }
-  }, [navigate, tableIdNum, toast])
+  }, [navigate, tableId, toast])
 
   useEffect(() => {
     fetchOrders()
-  }, [tableIdNum, navigate, fetchOrders])
+  }, [tableId, navigate, fetchOrders])
 
   return (
     <Box maxW="480px" mx="auto" h="100dvh" display="flex" flexDir="column" bg={{ base: 'transparent' }} position="relative" overflow="hidden">
       <Image src={BRAND.logoUrl} alt={BRAND.name} opacity={0.12} maxW="70%" maxH="70%" position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" pointerEvents="none" zIndex={0} objectFit="contain" style={{ WebkitTransform: 'translate(-50%, -50%)', willChange: 'transform, opacity' }} />
       <Box className="bg-blob" />
       <Box className="bg-blob-2" />
-      <TableHeader tableId={tableIdNum} />
+      <TableHeader tableId={tableId} />
       <Box p={4} flex="1" minH={0} overflowY="auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <HStack justify="space-between" align="center" mb={3}>
           <Heading size="md">Past Orders</Heading>

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { fetchJson } from '../utils/api'
 import { setSession } from '../utils/tableSession'
 
-export default function GuestForm({ tableId, onVerified }: { tableId: number, onVerified: () => void }) {
+export default function GuestForm({ tableId, onVerified }: { tableId: string, onVerified: () => void }) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)

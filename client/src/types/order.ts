@@ -7,7 +7,8 @@ export type OrderItem = {
 
 export type Order = {
   id: string;
-  tableId: number;
+  tableId: string;
+  sessionId?: string;
   createdAt: string;
   totalCents: number;
   items: OrderItem[];

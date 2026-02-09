@@ -6,8 +6,8 @@ const corsPlugin: FastifyPluginAsync = async (fastify) => {
     origin: (origin, cb) => {
       cb(null, true)
     },
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-Table-Session'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-Table-Session', 'X-Admin-Session'],
     exposedHeaders: ['*']
   })
 }
