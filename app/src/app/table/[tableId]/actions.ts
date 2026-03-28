@@ -15,6 +15,11 @@ export type PlaceOrderActionState = {
   message?: string
 }
 
+export type ServiceRequestActionState = {
+  status: 'idle' | 'success' | 'error'
+  message?: string
+}
+
 function normalizePhone(value: string) {
   return value.replace(/\D/g, '')
 }
@@ -278,5 +283,82 @@ export async function placeOrderForTable(
   return {
     status: 'success',
     message: 'Order placed successfully.'
+  }
+}
+
+export async function createServiceRequestForTable(
+  tableId: string,
+  _prevState: ServiceRequestActionState,
+  formData: FormData
+): Promise<ServiceRequestActionState> {
+  const requestType = String(formData.get('requestType') ?? '').trim()
+  const note = String(formData.get('note') ?? '').trim()
+
+  if (requestType !== 'payment' && requestType !== 'assistance') {
+    return {
+      status: 'error',
+      message: 'Choose what you need help with first.'
+    }
+  }
+
+  const supabase = createServerSupabaseClient()
+  const cookieStore = await cookies()
+  const currentSessionId = cookieStore.get(getTableSessionCookieName(tableId))?.value
+
+  if (!currentSessionId) {
+    return {
+      status: 'error',
+      message: 'Start your table session before requesting help.'
+    }
+  }
+
+  const { data: session, error: sessionError } = await supabase
+    .from('table_sessions')
+    .select('id, table_id, status')
+    .eq('id', currentSessionId)
+    .eq('table_id', tableId)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (sessionError || !session) {
+    return {
+      status: 'error',
+      message: 'Your session is no longer active. Please refresh and try again.'
+    }
+  }
+
+  const { error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      session_id: session.id,
+      table_id: tableId,
+      request_type: requestType,
+      note: note || null
+    })
+
+  if (requestError) {
+    return {
+      status: 'error',
+      message: 'Could not notify the staff right now. Please try again.'
+    }
+  }
+
+  await supabase
+    .from('table_sessions')
+    .update({
+      last_active_at: new Date().toISOString()
+    })
+    .eq('id', session.id)
+
+  revalidatePath(`/table/${tableId}`)
+  revalidatePath('/admin/sessions')
+  revalidatePath(`/admin/sessions/${tableId}`)
+
+  return {
+    status: 'success',
+    message:
+      requestType === 'payment'
+        ? 'The staff has been called for payment.'
+        : 'The staff has been notified that you need assistance.'
   }
 }

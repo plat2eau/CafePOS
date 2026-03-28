@@ -188,6 +188,54 @@ export type Database = {
         }
         Relationships: []
       }
+      service_requests: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          request_type: 'payment' | 'assistance'
+          resolved_at: string | null
+          session_id: string
+          status: 'open' | 'resolved'
+          table_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          request_type: 'payment' | 'assistance'
+          resolved_at?: string | null
+          session_id: string
+          status?: 'open' | 'resolved'
+          table_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          request_type?: 'payment' | 'assistance'
+          resolved_at?: string | null
+          session_id?: string
+          status?: 'open' | 'resolved'
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'service_requests_session_id_fkey'
+            columns: ['session_id']
+            isOneToOne: false
+            referencedRelation: 'table_sessions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'service_requests_table_id_fkey'
+            columns: ['table_id']
+            isOneToOne: false
+            referencedRelation: 'tables'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       table_sessions: {
         Row: {
           closed_at: string | null

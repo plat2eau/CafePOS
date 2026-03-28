@@ -71,7 +71,10 @@ export async function DELETE() {
 }
 
 export async function GET() {
-  const auth = await getAdminAuthContext()
+  const auth = await getAdminAuthContext({
+    persistRefreshedSession: true,
+    clearInvalidSession: true
+  })
 
   if (!auth) {
     return NextResponse.json(

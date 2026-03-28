@@ -18,6 +18,17 @@ export type AdminOrder = {
   items: AdminOrderItem[]
 }
 
+export type AdminServiceRequest = {
+  id: string
+  table_id: string
+  session_id: string
+  request_type: 'payment' | 'assistance'
+  note: string | null
+  status: 'open' | 'resolved'
+  created_at: string
+  guest_name: string | null
+}
+
 export type AdminSession = {
   id: string
   table_id: string
@@ -32,6 +43,7 @@ export type AdminOverviewData = {
   generatedAt: string
   sessions: AdminSession[]
   orders: AdminOrder[]
+  serviceRequests: AdminServiceRequest[]
 }
 
 export type AdminTableDetailData = {
@@ -49,6 +61,7 @@ export type AdminTableDetailData = {
     status: 'active' | 'closed'
   } | null
   recentOrders: AdminOrder[]
+  serviceRequests: AdminServiceRequest[]
 }
 
 async function fetchOrdersWithItems(options?: {
@@ -142,11 +155,30 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   const orders = await fetchOrdersWithItems({
     sessionIds: activeSessionIds
   })
+  const { data: serviceRequests, error: serviceRequestsError } = activeSessionIds.length
+    ? await supabase
+        .from('service_requests')
+        .select('id, table_id, session_id, request_type, note, status, created_at')
+        .in('session_id', activeSessionIds)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(20)
+    : { data: [], error: null }
+
+  if (serviceRequestsError) {
+    throw new Error('Could not load service requests.')
+  }
+
+  const sessionNameById = new Map((sessions ?? []).map((session) => [session.id, session.guest_name]))
 
   return {
     generatedAt: new Date().toISOString(),
     sessions: sessions ?? [],
-    orders
+    orders,
+    serviceRequests: (serviceRequests ?? []).map((request) => ({
+      ...request,
+      guest_name: sessionNameById.get(request.session_id) ?? null
+    }))
   }
 }
 
@@ -173,10 +205,26 @@ export async function getAdminTableDetailData(tableId: string): Promise<AdminTab
   const recentOrders = activeSession
     ? await fetchOrdersWithItems({ sessionId: activeSession.id })
     : []
+  const { data: serviceRequests, error: serviceRequestsError } = activeSession
+    ? await supabase
+        .from('service_requests')
+        .select('id, table_id, session_id, request_type, note, status, created_at')
+        .eq('session_id', activeSession.id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+    : { data: [], error: null }
+
+  if (serviceRequestsError) {
+    throw new Error('Could not load service requests.')
+  }
 
   return {
     table,
     activeSession,
-    recentOrders
+    recentOrders,
+    serviceRequests: (serviceRequests ?? []).map((request) => ({
+      ...request,
+      guest_name: activeSession?.guest_name ?? null
+    }))
   }
 }

@@ -100,6 +100,19 @@ export async function clearTableSession(tableId: string, sessionId: string) {
     redirect(`/admin/sessions/${tableId}?error=clear-failed`)
   }
 
+  const { error: resolveRequestsError } = await supabase
+    .from('service_requests')
+    .update({
+      status: 'resolved',
+      resolved_at: new Date().toISOString()
+    })
+    .eq('session_id', sessionId)
+    .eq('status', 'open')
+
+  if (resolveRequestsError) {
+    redirect(`/admin/sessions/${tableId}?error=clear-failed`)
+  }
+
   refreshAdminPaths(tableId)
   redirect(`/admin/sessions/${tableId}?success=table-cleared`)
 }

@@ -1,3 +1,4 @@
+import AdminSessionHeartbeat from '@/components/AdminSessionHeartbeat'
 import AdminTableDetailClient from '@/components/AdminTableDetailClient'
 import { requireAdminAuth } from '@/lib/admin-auth'
 import { getAdminTableDetailData } from '@/lib/admin-data'
@@ -18,6 +19,7 @@ export default async function AdminSessionDetailPage({
   return (
     <main>
       <section className="hero heroShell">
+        <AdminSessionHeartbeat />
         <AdminTableDetailClient
           tableId={tableId}
           signedInLabel={auth.profile.display_name ?? auth.email ?? 'Staff'}

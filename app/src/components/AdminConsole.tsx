@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AdminOrder, AdminOverviewData } from '@/lib/admin-data'
+import type { AdminOrder, AdminOverviewData, AdminServiceRequest } from '@/lib/admin-data'
 
 type AdminConsoleProps = {
   initialData: AdminOverviewData
@@ -29,7 +29,9 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
   const router = useRouter()
   const [data, setData] = useState(initialData)
   const [newOrderNotice, setNewOrderNotice] = useState<AdminOrder | null>(null)
+  const [newServiceRequestNotice, setNewServiceRequestNotice] = useState<AdminServiceRequest | null>(null)
   const latestOrderIdRef = useRef(initialData.orders[0]?.id ?? null)
+  const latestServiceRequestIdRef = useRef(initialData.serviceRequests[0]?.id ?? null)
 
   useEffect(() => {
     let cancelled = false
@@ -51,12 +53,21 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
       }
 
       const newestOrder = nextData.orders[0] ?? null
+      const newestServiceRequest = nextData.serviceRequests[0] ?? null
 
-      if (newestOrder && latestOrderIdRef.current && newestOrder.id !== latestOrderIdRef.current) {
+      if (newestOrder && newestOrder.id !== latestOrderIdRef.current) {
         setNewOrderNotice(newestOrder)
       }
 
+      if (
+        newestServiceRequest &&
+        newestServiceRequest.id !== latestServiceRequestIdRef.current
+      ) {
+        setNewServiceRequestNotice(newestServiceRequest)
+      }
+
       latestOrderIdRef.current = newestOrder?.id ?? null
+      latestServiceRequestIdRef.current = newestServiceRequest?.id ?? null
       setData(nextData)
     }
 
@@ -113,6 +124,41 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
         </article>
       ) : null}
 
+      {newServiceRequestNotice ? (
+        <article className="card supportCard adminAlertPopup adminAlertPopupOffset" aria-live="polite">
+          <p className="eyebrow">Server call</p>
+          <h2>{newServiceRequestNotice.guest_name ?? 'Guest'} needs the staff</h2>
+          <p>
+            Table {newServiceRequestNotice.table_id} requested{' '}
+            <strong>
+              {newServiceRequestNotice.request_type === 'payment' ? 'payment' : 'assistance'}
+            </strong>
+            .
+          </p>
+          {newServiceRequestNotice.note ? <p>Note: {newServiceRequestNotice.note}</p> : null}
+          <div className="buttonRow">
+            <button
+              className="button"
+              type="button"
+              onClick={() => {
+                const nextHref = `/admin/sessions/${newServiceRequestNotice.table_id}`
+                setNewServiceRequestNotice(null)
+                router.push(nextHref)
+              }}
+            >
+              Open table session
+            </button>
+            <button
+              className="button buttonSecondary"
+              type="button"
+              onClick={() => setNewServiceRequestNotice(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </article>
+      ) : null}
+
       <div className="compactGrid">
         <article className="card">
           <p className="eyebrow">Active tables</p>
@@ -123,6 +169,11 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
           <p className="eyebrow">Recent orders</p>
           <h2>{data.orders.length}</h2>
           <p>Orders visible in the admin console feed.</p>
+        </article>
+        <article className="card">
+          <p className="eyebrow">Server calls</p>
+          <h2>{data.serviceRequests.length}</h2>
+          <p>Open payment or assistance requests from active tables.</p>
         </article>
       </div>
 

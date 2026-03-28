@@ -78,6 +78,22 @@ export async function DELETE(request: Request, context: RouteContext) {
     )
   }
 
+  const { error: resolveRequestsError } = await supabase
+    .from('service_requests')
+    .update({
+      status: 'resolved',
+      resolved_at: new Date().toISOString()
+    })
+    .eq('session_id', sessionId)
+    .eq('status', 'open')
+
+  if (resolveRequestsError) {
+    return NextResponse.json(
+      { message: 'Table closed, but the service requests could not be resolved.' },
+      { status: 500 }
+    )
+  }
+
   revalidatePath('/admin/sessions')
   revalidatePath(`/admin/sessions/${tableId}`)
   revalidatePath('/api/admin/overview')

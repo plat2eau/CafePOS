@@ -1,8 +1,13 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { createOrRefreshTableSession, placeOrderForTable } from '@/app/table/[tableId]/actions'
+import {
+  createOrRefreshTableSession,
+  createServiceRequestForTable,
+  placeOrderForTable
+} from '@/app/table/[tableId]/actions'
 import GuestSessionForm from '@/components/GuestSessionForm'
 import GuestOrderingExperience from '@/components/GuestOrderingExperience'
+import GuestServiceRequestPanel from '@/components/GuestServiceRequestPanel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 import { getTableSessionCookieName } from '@/lib/table-session'
@@ -54,6 +59,7 @@ export default async function TablePage({ params }: TablePageProps) {
   const isCurrentGuestSession = activeSession?.id === currentSessionId
   const sessionAction = createOrRefreshTableSession.bind(null, tableId)
   const placeOrderAction = placeOrderForTable.bind(null, tableId)
+  const serviceRequestAction = createServiceRequestForTable.bind(null, tableId)
   const canAccessOrdering = Boolean(activeSession && isCurrentGuestSession)
 
   const itemsByCategory = new Map<string, MenuItem[]>(
@@ -132,6 +138,7 @@ export default async function TablePage({ params }: TablePageProps) {
               <h2>Ordering as {activeSession.guest_name}</h2>
               <p>Pick your favourites and send your order whenever you are ready.</p>
             </article>
+            <GuestServiceRequestPanel action={serviceRequestAction} />
             <GuestOrderingExperience
               tableId={tableId}
               categories={categories ?? []}

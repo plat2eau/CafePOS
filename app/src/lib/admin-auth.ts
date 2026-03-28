@@ -39,7 +39,14 @@ export async function clearAdminAuthCookies() {
   cookieStore.delete(refreshTokenCookieName)
 }
 
-export async function getAdminAuthContext(): Promise<AdminAuthContext | null> {
+type GetAdminAuthContextOptions = {
+  persistRefreshedSession?: boolean
+  clearInvalidSession?: boolean
+}
+
+export async function getAdminAuthContext(
+  options: GetAdminAuthContextOptions = {}
+): Promise<AdminAuthContext | null> {
   const cookieStore = await cookies()
   const accessToken = cookieStore.get(accessTokenCookieName)?.value
   const refreshToken = cookieStore.get(refreshTokenCookieName)?.value
@@ -54,10 +61,24 @@ export async function getAdminAuthContext(): Promise<AdminAuthContext | null> {
     refresh_token: refreshToken
   })
 
+  const session = sessionData.session
   const user = sessionData.user
 
   if (sessionError || !user) {
+    if (options.clearInvalidSession) {
+      await clearAdminAuthCookies()
+    }
+
     return null
+  }
+
+  if (
+    options.persistRefreshedSession &&
+    session?.access_token &&
+    session.refresh_token &&
+    (session.access_token !== accessToken || session.refresh_token !== refreshToken)
+  ) {
+    await setAdminAuthCookies(session.access_token, session.refresh_token)
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -67,6 +88,10 @@ export async function getAdminAuthContext(): Promise<AdminAuthContext | null> {
     .maybeSingle()
 
   if (profileError || !profile) {
+    if (options.clearInvalidSession) {
+      await clearAdminAuthCookies()
+    }
+
     return null
   }
 

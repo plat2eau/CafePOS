@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import AdminSessionHeartbeat from '@/components/AdminSessionHeartbeat'
 import AdminLogoutButton from '@/components/AdminLogoutButton'
 import AdminConsole from '@/components/AdminConsole'
 import { requireAdminAuth } from '@/lib/admin-auth'
@@ -11,6 +12,7 @@ export default async function AdminSessionsPage() {
   return (
     <main>
       <section className="hero heroShell">
+        <AdminSessionHeartbeat />
         <div className="heroHeader compact">
           <Link className="backLink" href="/admin/login">
             ← Back to login

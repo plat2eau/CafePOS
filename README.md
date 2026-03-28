@@ -23,7 +23,10 @@ Create `app/.env.local` from `app/.env.example` and fill in:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
 ```
+
+Keep `SUPABASE_SERVICE_ROLE_KEY` server-only. Do not expose it in browser code or client-side env vars.
 
 Run the app:
 
@@ -42,6 +45,15 @@ Then reset the local database:
 ```bash
 npx supabase db reset
 ```
+
+## Schema Preflight
+
+Open the home page after booting the app and check the `Supabase Readiness` card.
+
+- `ready for current app features`: the connected Supabase project has the schema this app expects
+- `migration update required`: at least one table/column is missing from the connected project
+
+If you are pointing at a hosted Supabase project, apply the latest SQL there too before trials.
 
 ## Next Steps
 

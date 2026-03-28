@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLogoutButton from '@/components/AdminLogoutButton'
-import type { AdminOrder, AdminTableDetailData } from '@/lib/admin-data'
+import type { AdminOrder, AdminServiceRequest, AdminTableDetailData } from '@/lib/admin-data'
 import type { Database } from '@/lib/database.types'
 
 type OrderStatus = Database['public']['Tables']['orders']['Row']['status']
@@ -47,9 +47,63 @@ export default function AdminTableDetailClient({
   const [table] = useState(initialData.table)
   const [activeSession, setActiveSession] = useState(initialData.activeSession)
   const [recentOrders, setRecentOrders] = useState(initialData.recentOrders)
+  const [serviceRequests, setServiceRequests] = useState(initialData.serviceRequests)
+  const [newServiceRequestNotice, setNewServiceRequestNotice] = useState<AdminServiceRequest | null>(null)
   const [flash, setFlash] = useState<FlashMessage | null>(null)
   const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null)
   const [isClearingTable, setIsClearingTable] = useState(false)
+  const latestServiceRequestIdRef = useRef(initialData.serviceRequests[0]?.id ?? null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function refreshTableDetail() {
+      const response = await fetch(`/api/admin/tables/${tableId}/detail`, {
+        method: 'GET',
+        cache: 'no-store'
+      }).catch(() => null)
+
+      if (!response || cancelled) {
+        return
+      }
+
+      if (response.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
+      if (!response.ok) {
+        return
+      }
+
+      const nextData = (await response.json()) as AdminTableDetailData
+
+      if (cancelled) {
+        return
+      }
+
+      const newestServiceRequest = nextData.serviceRequests[0] ?? null
+
+      if (
+        newestServiceRequest &&
+        newestServiceRequest.id !== latestServiceRequestIdRef.current
+      ) {
+        setNewServiceRequestNotice(newestServiceRequest)
+      }
+
+      latestServiceRequestIdRef.current = newestServiceRequest?.id ?? null
+      setActiveSession(nextData.activeSession)
+      setRecentOrders(nextData.recentOrders)
+      setServiceRequests(nextData.serviceRequests)
+    }
+
+    const interval = window.setInterval(refreshTableDetail, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [router, tableId])
 
   async function handleOrderStatusChange(orderId: string, nextStatus: OrderStatus) {
     setFlash(null)
@@ -135,6 +189,8 @@ export default function AdminTableDetailClient({
     }
 
     setActiveSession(null)
+    setServiceRequests([])
+    setNewServiceRequestNotice(null)
     setFlash({
       tone: 'success',
       message: payload?.message ?? 'Table session cleared.'
@@ -168,6 +224,33 @@ export default function AdminTableDetailClient({
 
   return (
     <>
+      {newServiceRequestNotice ? (
+        <article className="card supportCard adminAlertPopup adminAlertPopupOffset" aria-live="polite">
+          <p className="eyebrow">Server call</p>
+          <h2>{newServiceRequestNotice.guest_name ?? 'Guest'} needs the staff</h2>
+          <p>
+            Table {newServiceRequestNotice.table_id} requested{' '}
+            <strong>
+              {newServiceRequestNotice.request_type === 'payment' ? 'payment' : 'assistance'}
+            </strong>
+            .
+          </p>
+          {newServiceRequestNotice.note ? <p>Note: {newServiceRequestNotice.note}</p> : null}
+          <div className="buttonRow">
+            <button className="button" type="button" onClick={() => setNewServiceRequestNotice(null)}>
+              Keep viewing table
+            </button>
+            <button
+              className="button buttonSecondary"
+              type="button"
+              onClick={() => setNewServiceRequestNotice(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </article>
+      ) : null}
+
       <div className="heroHeader compact">
         <Link className="backLink" href="/admin/sessions">
           ← Back to sessions
@@ -269,47 +352,70 @@ export default function AdminTableDetailClient({
             </article>
 
             <article className="card">
-              <p className="eyebrow">Order queue</p>
-              <h2>Recent orders for this table</h2>
+              <p className="eyebrow">Server calls</p>
+              <h2>Open service requests</h2>
               <div className="stack">
-                {recentOrders.length === 0 ? (
-                  <p>No orders have been placed for this table yet.</p>
+                {serviceRequests.length === 0 ? (
+                  <p>No open service requests for this session.</p>
                 ) : (
-                  recentOrders.map((order) => (
-                    <div className="adminOrderCard" key={order.id}>
+                  serviceRequests.map((request: AdminServiceRequest) => (
+                    <div className="adminSessionCard" key={request.id}>
                       <div className="summaryRow">
-                        <strong>Order {order.id.slice(0, 8)}</strong>
-                        <span>{formatTimestamp(order.created_at)}</span>
+                        <strong>
+                          {request.request_type === 'payment' ? 'Payment requested' : 'Assistance requested'}
+                        </strong>
+                        <span>{formatTimestamp(request.created_at)}</span>
                       </div>
-                      <p>
-                        {order.guest_name ?? 'Guest'} · <span className="statusChip">{order.status}</span>
-                      </p>
-                      <div className="stack">
-                        {order.items.map((item, index) => (
-                          <div className="summaryRow" key={`${order.id}-${index}`}>
-                            <span>
-                              {item.item_name} x {item.quantity}
-                            </span>
-                            <strong>{toPrice(item.line_total_cents)}</strong>
-                          </div>
-                        ))}
-                      </div>
-                      {order.note ? <p>Note: {order.note}</p> : null}
-                      <div className="summaryRow total">
-                        <span>Total</span>
-                        <strong>{toPrice(order.total_cents)}</strong>
-                      </div>
-                      <div className="adminStatusActions">
-                        {orderStatuses.map((status) => (
-                          <div key={`${order.id}-${status}`}>{renderStatusButton(order, status)}</div>
-                        ))}
-                      </div>
+                      <p>{request.guest_name ?? 'Guest'}</p>
+                      {request.note ? <p>Note: {request.note}</p> : null}
                     </div>
                   ))
                 )}
               </div>
             </article>
           </div>
+
+          <article className="card">
+            <p className="eyebrow">Order queue</p>
+            <h2>Recent orders for this table</h2>
+            <div className="stack">
+              {recentOrders.length === 0 ? (
+                <p>No orders have been placed for this table yet.</p>
+              ) : (
+                recentOrders.map((order) => (
+                  <div className="adminOrderCard" key={order.id}>
+                    <div className="summaryRow">
+                      <strong>Order {order.id.slice(0, 8)}</strong>
+                      <span>{formatTimestamp(order.created_at)}</span>
+                    </div>
+                    <p>
+                      {order.guest_name ?? 'Guest'} · <span className="statusChip">{order.status}</span>
+                    </p>
+                    <div className="stack">
+                      {order.items.map((item, index) => (
+                        <div className="summaryRow" key={`${order.id}-${index}`}>
+                          <span>
+                            {item.item_name} x {item.quantity}
+                          </span>
+                          <strong>{toPrice(item.line_total_cents)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    {order.note ? <p>Note: {order.note}</p> : null}
+                    <div className="summaryRow total">
+                      <span>Total</span>
+                      <strong>{toPrice(order.total_cents)}</strong>
+                    </div>
+                    <div className="adminStatusActions">
+                      {orderStatuses.map((status) => (
+                        <div key={`${order.id}-${status}`}>{renderStatusButton(order, status)}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </article>
         </>
       )}
     </>
