@@ -1,0 +1,19 @@
+{
+  "name": "cafepos",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w app",
+    "build": "npm run build -w app",
+    "start": "npm run start -w app",
+    "lint": "npm run lint -w app",
+    "typecheck": "npm run typecheck -w app",
+    "clean": "npm run clean -w app"
+  },
+  "devDependencies": {
+    "supabase": "^2.84.4"
+  }
+}

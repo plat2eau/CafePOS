@@ -1,0 +1,182 @@
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+export type AdminOrderItem = {
+  item_name: string
+  quantity: number
+  line_total_cents: number
+}
+
+export type AdminOrder = {
+  id: string
+  table_id: string
+  created_at: string
+  status: 'placed' | 'preparing' | 'served' | 'cancelled'
+  note: string | null
+  total_cents: number
+  session_id: string
+  guest_name: string | null
+  items: AdminOrderItem[]
+}
+
+export type AdminSession = {
+  id: string
+  table_id: string
+  guest_name: string
+  guest_phone: string
+  last_active_at: string
+  started_at?: string
+  status?: 'active' | 'closed'
+}
+
+export type AdminOverviewData = {
+  generatedAt: string
+  sessions: AdminSession[]
+  orders: AdminOrder[]
+}
+
+export type AdminTableDetailData = {
+  table: {
+    id: string
+    label: string
+    is_active: boolean
+  } | null
+  activeSession: {
+    id: string
+    guest_name: string
+    guest_phone: string
+    started_at: string
+    last_active_at: string
+    status: 'active' | 'closed'
+  } | null
+  recentOrders: AdminOrder[]
+}
+
+async function fetchOrdersWithItems(options?: {
+  tableId?: string
+  sessionId?: string
+  sessionIds?: string[]
+}) {
+  const supabase = createServerSupabaseClient()
+  const ordersQuery = supabase
+    .from('orders')
+    .select('id, table_id, created_at, status, note, total_cents, session_id')
+    .is('archived_at', null)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  const filteredQuery = options?.tableId
+    ? ordersQuery.eq('table_id', options.tableId)
+    : options?.sessionId
+      ? ordersQuery.eq('session_id', options.sessionId)
+    : options?.sessionIds
+      ? options.sessionIds.length > 0
+        ? ordersQuery.in('session_id', options.sessionIds)
+        : null
+      : ordersQuery
+
+  const { data: orders, error: ordersError } = filteredQuery
+    ? await filteredQuery
+    : { data: [], error: null }
+
+  if (ordersError) {
+    throw new Error('Could not load orders.')
+  }
+
+  const sessionIds = Array.from(new Set((orders ?? []).map((order) => order.session_id)))
+  const orderIds = (orders ?? []).map((order) => order.id)
+
+  const [{ data: orderItems, error: orderItemsError }, { data: sessionDetails, error: sessionDetailsError }] = await Promise.all([
+    orderIds.length > 0
+      ? supabase
+          .from('order_items')
+          .select('order_id, item_name, quantity, line_total_cents')
+          .in('order_id', orderIds)
+      : Promise.resolve({ data: [], error: null }),
+    sessionIds.length > 0
+      ? supabase
+          .from('table_sessions')
+          .select('id, guest_name')
+          .in('id', sessionIds)
+      : Promise.resolve({ data: [], error: null })
+  ])
+
+  if (orderItemsError || sessionDetailsError) {
+    throw new Error('Could not load order details.')
+  }
+
+  const sessionNameById = new Map(
+    (sessionDetails ?? []).map((session) => [session.id, session.guest_name])
+  )
+
+  const orderItemsByOrderId = new Map<string, AdminOrderItem[]>()
+
+  for (const item of orderItems ?? []) {
+    const list = orderItemsByOrderId.get(item.order_id)
+    if (list) {
+      list.push(item)
+    } else {
+      orderItemsByOrderId.set(item.order_id, [item])
+    }
+  }
+
+  return (orders ?? []).map((order) => ({
+    ...order,
+    guest_name: sessionNameById.get(order.session_id) ?? null,
+    items: orderItemsByOrderId.get(order.id) ?? []
+  }))
+}
+
+export async function getAdminOverviewData(): Promise<AdminOverviewData> {
+  const supabase = createServerSupabaseClient()
+  const { data: sessions, error: sessionsError } = await supabase
+    .from('table_sessions')
+    .select('id, table_id, guest_name, guest_phone, last_active_at')
+    .eq('status', 'active')
+    .order('last_active_at', { ascending: false })
+
+  if (sessionsError) {
+    throw new Error('Could not load active sessions.')
+  }
+
+  const activeSessionIds = (sessions ?? []).map((session) => session.id)
+  const orders = await fetchOrdersWithItems({
+    sessionIds: activeSessionIds
+  })
+
+  return {
+    generatedAt: new Date().toISOString(),
+    sessions: sessions ?? [],
+    orders
+  }
+}
+
+export async function getAdminTableDetailData(tableId: string): Promise<AdminTableDetailData> {
+  const supabase = createServerSupabaseClient()
+  const [{ data: table, error: tableError }, { data: activeSession, error: sessionError }] = await Promise.all([
+    supabase
+      .from('tables')
+      .select('id, label, is_active')
+      .eq('id', tableId)
+      .maybeSingle(),
+    supabase
+      .from('table_sessions')
+      .select('id, guest_name, guest_phone, started_at, last_active_at, status')
+      .eq('table_id', tableId)
+      .eq('status', 'active')
+      .maybeSingle()
+  ])
+
+  if (tableError || sessionError) {
+    throw new Error('Could not load table details.')
+  }
+
+  const recentOrders = activeSession
+    ? await fetchOrdersWithItems({ sessionId: activeSession.id })
+    : []
+
+  return {
+    table,
+    activeSession,
+    recentOrders
+  }
+}
