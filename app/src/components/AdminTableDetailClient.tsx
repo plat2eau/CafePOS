@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLogoutButton from '@/components/AdminLogoutButton'
 import type { AdminOrder, AdminServiceRequest, AdminTableDetailData } from '@/lib/admin-data'
@@ -48,11 +48,9 @@ export default function AdminTableDetailClient({
   const [activeSession, setActiveSession] = useState(initialData.activeSession)
   const [recentOrders, setRecentOrders] = useState(initialData.recentOrders)
   const [serviceRequests, setServiceRequests] = useState(initialData.serviceRequests)
-  const [newServiceRequestNotice, setNewServiceRequestNotice] = useState<AdminServiceRequest | null>(null)
   const [flash, setFlash] = useState<FlashMessage | null>(null)
   const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null)
   const [isClearingTable, setIsClearingTable] = useState(false)
-  const latestServiceRequestIdRef = useRef(initialData.serviceRequests[0]?.id ?? null)
 
   useEffect(() => {
     let cancelled = false
@@ -81,17 +79,6 @@ export default function AdminTableDetailClient({
       if (cancelled) {
         return
       }
-
-      const newestServiceRequest = nextData.serviceRequests[0] ?? null
-
-      if (
-        newestServiceRequest &&
-        newestServiceRequest.id !== latestServiceRequestIdRef.current
-      ) {
-        setNewServiceRequestNotice(newestServiceRequest)
-      }
-
-      latestServiceRequestIdRef.current = newestServiceRequest?.id ?? null
       setActiveSession(nextData.activeSession)
       setRecentOrders(nextData.recentOrders)
       setServiceRequests(nextData.serviceRequests)
@@ -190,7 +177,6 @@ export default function AdminTableDetailClient({
 
     setActiveSession(null)
     setServiceRequests([])
-    setNewServiceRequestNotice(null)
     setFlash({
       tone: 'success',
       message: payload?.message ?? 'Table session cleared.'
@@ -224,33 +210,6 @@ export default function AdminTableDetailClient({
 
   return (
     <>
-      {newServiceRequestNotice ? (
-        <article className="card supportCard adminAlertPopup adminAlertPopupOffset" aria-live="polite">
-          <p className="eyebrow">Server call</p>
-          <h2>{newServiceRequestNotice.guest_name ?? 'Guest'} needs the staff</h2>
-          <p>
-            Table {newServiceRequestNotice.table_id} requested{' '}
-            <strong>
-              {newServiceRequestNotice.request_type === 'payment' ? 'payment' : 'assistance'}
-            </strong>
-            .
-          </p>
-          {newServiceRequestNotice.note ? <p>Note: {newServiceRequestNotice.note}</p> : null}
-          <div className="buttonRow">
-            <button className="button" type="button" onClick={() => setNewServiceRequestNotice(null)}>
-              Keep viewing table
-            </button>
-            <button
-              className="button buttonSecondary"
-              type="button"
-              onClick={() => setNewServiceRequestNotice(null)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </article>
-      ) : null}
-
       <div className="heroHeader compact">
         <Link className="backLink" href="/admin/sessions">
           ← Back to sessions

@@ -1,9 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AdminOrder, AdminOverviewData, AdminServiceRequest } from '@/lib/admin-data'
+import { useEffect, useMemo, useState } from 'react'
+import type { AdminOrder, AdminOverviewData } from '@/lib/admin-data'
 
 type AdminConsoleProps = {
   initialData: AdminOverviewData
@@ -26,12 +25,7 @@ function formatTimestamp(value: string) {
 }
 
 export default function AdminConsole({ initialData }: AdminConsoleProps) {
-  const router = useRouter()
   const [data, setData] = useState(initialData)
-  const [newOrderNotice, setNewOrderNotice] = useState<AdminOrder | null>(null)
-  const [newServiceRequestNotice, setNewServiceRequestNotice] = useState<AdminServiceRequest | null>(null)
-  const latestOrderIdRef = useRef(initialData.orders[0]?.id ?? null)
-  const latestServiceRequestIdRef = useRef(initialData.serviceRequests[0]?.id ?? null)
 
   useEffect(() => {
     let cancelled = false
@@ -51,23 +45,6 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
       if (cancelled) {
         return
       }
-
-      const newestOrder = nextData.orders[0] ?? null
-      const newestServiceRequest = nextData.serviceRequests[0] ?? null
-
-      if (newestOrder && newestOrder.id !== latestOrderIdRef.current) {
-        setNewOrderNotice(newestOrder)
-      }
-
-      if (
-        newestServiceRequest &&
-        newestServiceRequest.id !== latestServiceRequestIdRef.current
-      ) {
-        setNewServiceRequestNotice(newestServiceRequest)
-      }
-
-      latestOrderIdRef.current = newestOrder?.id ?? null
-      latestServiceRequestIdRef.current = newestServiceRequest?.id ?? null
       setData(nextData)
     }
 
@@ -96,69 +73,6 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
 
   return (
     <div className="sectionStack">
-      {newOrderNotice ? (
-        <article className="card supportCard adminAlertPopup" aria-live="polite">
-          <p className="eyebrow">New order</p>
-          <h2>{newOrderNotice.guest_name ?? 'Guest'} placed an order</h2>
-          <p>
-            Table {newOrderNotice.table_id} just placed a new order for{' '}
-            <strong>{toPrice(newOrderNotice.total_cents)}</strong>.
-          </p>
-          <p>Open the table session to start handling it right away.</p>
-          <div className="buttonRow">
-            <button
-              className="button"
-              type="button"
-              onClick={() => {
-                const nextHref = `/admin/sessions/${newOrderNotice.table_id}`
-                setNewOrderNotice(null)
-                router.push(nextHref)
-              }}
-            >
-              Open table session
-            </button>
-            <button className="button buttonSecondary" type="button" onClick={() => setNewOrderNotice(null)}>
-              Dismiss
-            </button>
-          </div>
-        </article>
-      ) : null}
-
-      {newServiceRequestNotice ? (
-        <article className="card supportCard adminAlertPopup adminAlertPopupOffset" aria-live="polite">
-          <p className="eyebrow">Server call</p>
-          <h2>{newServiceRequestNotice.guest_name ?? 'Guest'} needs the staff</h2>
-          <p>
-            Table {newServiceRequestNotice.table_id} requested{' '}
-            <strong>
-              {newServiceRequestNotice.request_type === 'payment' ? 'payment' : 'assistance'}
-            </strong>
-            .
-          </p>
-          {newServiceRequestNotice.note ? <p>Note: {newServiceRequestNotice.note}</p> : null}
-          <div className="buttonRow">
-            <button
-              className="button"
-              type="button"
-              onClick={() => {
-                const nextHref = `/admin/sessions/${newServiceRequestNotice.table_id}`
-                setNewServiceRequestNotice(null)
-                router.push(nextHref)
-              }}
-            >
-              Open table session
-            </button>
-            <button
-              className="button buttonSecondary"
-              type="button"
-              onClick={() => setNewServiceRequestNotice(null)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </article>
-      ) : null}
-
       <div className="compactGrid">
         <article className="card">
           <p className="eyebrow">Active tables</p>
