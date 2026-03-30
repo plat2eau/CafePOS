@@ -53,6 +53,17 @@ export default function GuestOrderingExperience({
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [showSuccessCard, setShowSuccessCard] = useState(false)
   const [isOrderSheetOpen, setIsOrderSheetOpen] = useState(false)
+  const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
+  const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? '')
+
+  const categorySections = useMemo(
+    () =>
+      categories.map((category) => ({
+        ...category,
+        anchorId: `menu-category-${category.id}`
+      })),
+    [categories]
+  )
 
   const itemsByCategory = useMemo(() => {
     const map = new Map<string, MenuItem[]>(
@@ -109,6 +120,61 @@ export default function GuestOrderingExperience({
     }
   }, [router, state.status, tableId])
 
+  useEffect(() => {
+    if (!categorySections.length) {
+      setActiveCategoryId('')
+      return
+    }
+
+    setActiveCategoryId((current) =>
+      categorySections.some((category) => category.id === current)
+        ? current
+        : categorySections[0].id
+    )
+  }, [categorySections])
+
+  useEffect(() => {
+    if (!categorySections.length) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntries = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)
+
+        if (!visibleEntries[0]) {
+          return
+        }
+
+        const nextCategoryId = visibleEntries[0].target.getAttribute('data-category-id')
+        if (nextCategoryId) {
+          setActiveCategoryId(nextCategoryId)
+        }
+      },
+      {
+        rootMargin: '-15% 0px -55% 0px',
+        threshold: [0.2, 0.35, 0.5, 0.75]
+      }
+    )
+
+    for (const category of categorySections) {
+      const element = document.getElementById(category.anchorId)
+      if (element) {
+        observer.observe(element)
+      }
+    }
+
+    return () => observer.disconnect()
+  }, [categorySections])
+
+  useEffect(() => {
+    if (isOrderSheetOpen) {
+      setIsNavigatorOpen(false)
+    }
+  }, [isOrderSheetOpen])
+
   function adjustQuantity(itemId: string, delta: number) {
     setQuantities((current) => {
       const nextQuantity = Math.max(0, (current[itemId] ?? 0) + delta)
@@ -122,6 +188,19 @@ export default function GuestOrderingExperience({
         [itemId]: nextQuantity
       }
     })
+  }
+
+  function jumpToCategory(categoryId: string, anchorId: string) {
+    document.getElementById(anchorId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+    setActiveCategoryId(categoryId)
+    setIsNavigatorOpen(false)
+  }
+
+  function toggleOrderSheet() {
+    setIsOrderSheetOpen((current) => !current)
   }
 
   return (
@@ -152,15 +231,14 @@ export default function GuestOrderingExperience({
             </article>
           ) : null}
 
-          <article className="card menuIntroCard">
-            <p className="eyebrow">Menu</p>
-            <h2>What would you like today, {guestName}?</h2>
-            <p>Choose your favourites below and adjust quantities as you go.</p>
-          </article>
-
           <div className="grid">
-            {categories.map((category) => (
-              <article className="card" key={category.id}>
+            {categorySections.map((category) => (
+              <article
+                className="card menuCategoryCard"
+                key={category.id}
+                id={category.anchorId}
+                data-category-id={category.id}
+              >
                 <p className="eyebrow">{category.name}</p>
                 <h2>{category.name}</h2>
                 {(itemsByCategory.get(category.id) ?? []).length === 0 ? (
@@ -210,13 +288,34 @@ export default function GuestOrderingExperience({
         </div>
 
         <div className={`mobileBottomBar${isOrderSheetOpen ? ' expanded' : ''}`}>
-          <div className="mobileBottomBarSummary">
-            <strong>{selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}</strong>
-            <span>{toPrice(totalCents)}</span>
-          </div>
+          <button
+            className="mobileBottomBarSummary"
+            type="button"
+            aria-expanded={isOrderSheetOpen}
+            aria-controls="order-drawer-panel"
+            onClick={toggleOrderSheet}
+          >
+            <span className="mobileBottomBarSummaryText">
+              <strong>{selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}</strong>
+              <span>{toPrice(totalCents)}</span>
+            </span>
+            <span className={`mobileBottomBarChevron${isOrderSheetOpen ? ' expanded' : ''}`}>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+          </button>
 
           {isOrderSheetOpen ? (
-            <div className="orderDrawerPanel">
+            <div className="orderDrawerPanel" id="order-drawer-panel">
               <div className="orderDrawerHeader">
                 <div>
                   <p className="eyebrow">Your cart</p>
@@ -287,6 +386,57 @@ export default function GuestOrderingExperience({
             </button>
           )}
         </div>
+
+        {categorySections.length > 1 && !isOrderSheetOpen ? (
+          <div className={`menuNavigator${isNavigatorOpen ? ' open' : ''}`}>
+            {isNavigatorOpen ? (
+              <div className="menuNavigatorPanel" aria-label="Menu sections">
+                <p className="menuNavigatorLabel">Jump to section</p>
+                <div className="menuNavigatorList">
+                  {categorySections.map((category) => (
+                    <button
+                      key={category.id}
+                      className={`menuNavigatorItem${
+                        activeCategoryId === category.id ? ' active' : ''
+                      }`}
+                      type="button"
+                      onClick={() => jumpToCategory(category.id, category.anchorId)}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <button
+              className="menuNavigatorToggle"
+              type="button"
+              aria-expanded={isNavigatorOpen}
+              aria-label={
+                isNavigatorOpen
+                  ? 'Close menu section navigator'
+                  : 'Open menu section navigator'
+              }
+              onClick={() => setIsNavigatorOpen((current) => !current)}
+            >
+              <svg
+                className="menuNavigatorToggleIcon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h10" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
       </div>
     </form>
   )

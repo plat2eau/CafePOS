@@ -230,7 +230,6 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: clamp(14px, 2vw, 20px);
-  margin-top: 24px;
 }
 
 .card {
@@ -343,11 +342,14 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   margin: 4px 0 0;
 }
 
+.menuCategoryCard {
+  scroll-margin-top: 24px;
+}
+
 .buttonRow {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 20px;
 }
 
 .button {
@@ -576,6 +578,138 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mobileBottomBarSummaryText {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+}
+
+.mobileBottomBarChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card-bg);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.mobileBottomBarChevron svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mobileBottomBarChevron.expanded {
+  transform: rotate(180deg);
+  border-color: rgb(var(--accent-rgb) / 0.36);
+  background: var(--accent-soft);
+}
+
+.menuNavigator {
+  position: fixed;
+  right: 12px;
+  bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.menuNavigatorPanel {
+  width: min(240px, calc(100vw - 24px));
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.08), transparent 42%),
+    var(--panel-strong);
+  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.menuNavigatorLabel {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.menuNavigatorList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(45vh, 320px);
+  overflow-y: auto;
+}
+
+.menuNavigatorItem,
+.menuNavigatorToggle {
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.menuNavigatorItem {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-align: left;
+}
+
+.menuNavigatorItem:hover,
+.menuNavigatorItem.active {
+  border-color: rgb(var(--accent-rgb) / 0.36);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.menuNavigatorToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 999px;
+  box-shadow: 0 14px 28px rgb(var(--shadow-rgb) / 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.menuNavigatorToggle:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--accent-rgb) / 0.36);
+}
+
+.menuNavigatorToggleIcon {
+  width: 24px;
+  height: 24px;
 }
 
 .adminOrderCard,
@@ -851,6 +985,10 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   .mobileBottomBar {
     width: min(720px, calc(100vw - 40px));
   }
+
+  .menuNavigator {
+    right: 20px;
+  }
 }
 
 
@@ -864,5 +1002,9 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   .responsiveSplit {
     grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
     align-items: start;
+  }
+
+  .menuNavigator {
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   }
 }

@@ -114,11 +114,6 @@ export default async function TablePage({ params }: TablePageProps) {
                 <p className="lead">Fresh coffee, tea, and bites made for your table.</p>
               )}
             </div>
-
-            <div className="metaPillRow">
-              <span className="metaPill">Table {tableId}</span>
-              {activeSession ? <span className="metaPill">Hello, {activeSession.guest_name}</span> : null}
-            </div>
           </div>
         </div>
 

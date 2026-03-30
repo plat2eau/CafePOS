@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import GuestOrderHistoryPoller from '@/components/GuestOrderHistoryPoller'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getTableSessionCookieName } from '@/lib/table-session'
 
@@ -38,6 +39,8 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
   return (
     <main>
       <section className="hero heroShell">
+        {currentSessionId ? <GuestOrderHistoryPoller /> : null}
+
         <div className="heroHeader compact">
           <Link className="backLink" href={`/table/${tableId}`}>
             ← Back to menu
@@ -47,6 +50,11 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
           <p className="lead">
             This route will show only the orders associated with the active table session.
           </p>
+          {currentSessionId ? (
+            <div className="metaPillRow">
+              <span className="metaPill">Auto-refreshes every 5 seconds</span>
+            </div>
+          ) : null}
         </div>
 
         {placed === '1' ? (
