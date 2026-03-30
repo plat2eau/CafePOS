@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
 import {
@@ -79,6 +80,26 @@ export default async function TablePage({ params }: TablePageProps) {
     <main>
       <section className="hero heroShell">
         <div className="heroHeader compact">
+          <div className="customerBrandBlink" aria-hidden="true">
+            <div className="customerBrandBlinkFrame">
+              <Image
+                src="/cheekoo-light.png"
+                alt=""
+                className="customerBrandBlinkAsset customerBrandBlinkAssetLight"
+                width={894}
+                height={144}
+                priority
+              />
+              <Image
+                src="/cheekoo-dark.png"
+                alt=""
+                className="customerBrandBlinkAsset customerBrandBlinkAssetDark"
+                width={894}
+                height={144}
+                priority
+              />
+            </div>
+          </div>
           <p className="eyebrow">CafePOS</p>
           <div className="heroHeaderRow">
             <div className="sectionStack">

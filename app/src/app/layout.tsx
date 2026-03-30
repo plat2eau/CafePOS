@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import ThemeToggle from '@/components/ThemeToggle'
+import { defaultColorScheme, getColorSchemeBootScript } from '@/lib/color-schemes'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -8,9 +10,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" data-color-scheme={defaultColorScheme} suppressHydrationWarning>
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: getColorSchemeBootScript() }} />
+        <ThemeToggle />
+        {children}
+      </body>
     </html>
   )
 }
-

@@ -2,12 +2,42 @@
   --bg: #f5efe6;
   --panel: rgba(255, 251, 245, 0.92);
   --panel-strong: rgba(255, 253, 250, 0.96);
+  --card-bg: rgba(255, 255, 255, 0.72);
+  --card-bg-strong: rgba(255, 255, 255, 0.84);
+  --button-text: #fff8ef;
   --text: #2b2017;
   --muted: #6b5848;
   --border: #d8c7b4;
   --accent: #7b4b25;
-  --accent-soft: rgba(123, 75, 37, 0.1);
-  --shadow: 0 18px 48px rgba(55, 32, 16, 0.08);
+  --accent-rgb: 123 75 37;
+  --shadow-rgb: 55 32 16;
+  --accent-soft: rgb(var(--accent-rgb) / 0.1);
+  --focus-ring: rgb(var(--accent-rgb) / 0.2);
+  --bg-glow: rgb(255 241 220 / 0.8);
+  --bg-gradient-start: #faf3e8;
+  --bg-gradient-end: #efe3d1;
+  --shadow: 0 18px 48px rgb(var(--shadow-rgb) / 0.08);
+}
+
+html[data-color-scheme='dark'] {
+  --bg: #121b28;
+  --panel: rgb(21 30 42 / 0.9);
+  --panel-strong: rgb(24 35 49 / 0.96);
+  --card-bg: rgb(20 31 44 / 0.84);
+  --card-bg-strong: rgb(26 38 53 / 0.92);
+  --button-text: #eff7ff;
+  --text: #edf4ff;
+  --muted: #9eb2c8;
+  --border: #314559;
+  --accent: #7dd3fc;
+  --accent-rgb: 125 211 252;
+  --shadow-rgb: 3 10 20;
+  --accent-soft: rgb(var(--accent-rgb) / 0.16);
+  --focus-ring: rgb(var(--accent-rgb) / 0.24);
+  --bg-glow: rgb(58 98 138 / 0.4);
+  --bg-gradient-start: #162131;
+  --bg-gradient-end: #0d141f;
+  --shadow: 0 18px 48px rgb(var(--shadow-rgb) / 0.35);
 }
 
 * {
@@ -19,8 +49,8 @@ body {
   margin: 0;
   min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(255, 241, 220, 0.8), transparent 30%),
-    linear-gradient(180deg, #faf3e8 0%, #efe3d1 100%);
+    radial-gradient(circle at top left, var(--bg-glow), transparent 30%),
+    linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
   color: var(--text);
   font-family: Georgia, "Times New Roman", serif;
 }
@@ -75,6 +105,46 @@ main {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.customerBrandBlink {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.customerBrandBlinkFrame {
+  position: relative;
+  width: min(420px, 82vw);
+  aspect-ratio: 894 / 144;
+}
+
+.customerBrandBlinkAsset {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+}
+
+.customerBrandBlinkAssetLight {
+  opacity: 0;
+}
+
+.customerBrandBlinkAssetDark {
+  opacity: 1;
+  animation: customerBrandGlow 1.8s ease-in-out infinite;
+}
+
+html[data-color-scheme='dark'] .customerBrandBlinkAssetLight {
+  opacity: 1;
+  animation: customerBrandGlow 1.8s ease-in-out infinite;
+}
+
+html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
+  opacity: 0;
+  animation: none;
 }
 
 .heroHeader.compact h1 {
@@ -167,7 +237,7 @@ main {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: clamp(18px, 2.8vw, 24px);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--card-bg);
   min-width: 0;
 }
 
@@ -188,13 +258,13 @@ main {
 
 .cardLink:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 32px rgba(55, 32, 16, 0.08);
-  border-color: rgba(123, 75, 37, 0.35);
+  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.08);
+  border-color: rgb(var(--accent-rgb) / 0.35);
 }
 
 .supportCard {
   background:
-    linear-gradient(135deg, rgba(123, 75, 37, 0.12), transparent 60%),
+    linear-gradient(135deg, rgb(var(--accent-rgb) / 0.12), transparent 60%),
     var(--panel-strong);
 }
 
@@ -208,20 +278,20 @@ main {
   max-width: 760px;
   margin: 0 auto;
   background:
-    radial-gradient(circle at top right, rgba(123, 75, 37, 0.08), transparent 34%),
-    rgba(255, 255, 255, 0.84);
+    radial-gradient(circle at top right, rgb(var(--accent-rgb) / 0.08), transparent 34%),
+    var(--card-bg-strong);
 }
 
 .guestBanner {
   background:
-    radial-gradient(circle at top right, rgba(123, 75, 37, 0.12), transparent 36%),
-    linear-gradient(135deg, rgba(255, 249, 241, 0.98), rgba(255, 255, 255, 0.9));
+    radial-gradient(circle at top right, rgb(var(--accent-rgb) / 0.12), transparent 36%),
+    linear-gradient(135deg, var(--panel-strong), var(--card-bg-strong));
 }
 
 .menuIntroCard {
   background:
-    radial-gradient(circle at top left, rgba(123, 75, 37, 0.09), transparent 34%),
-    rgba(255, 255, 255, 0.82);
+    radial-gradient(circle at top left, rgb(var(--accent-rgb) / 0.09), transparent 34%),
+    var(--card-bg-strong);
 }
 
 .successHeroCard {
@@ -258,7 +328,7 @@ main {
 }
 
 .menuItem:hover {
-  border-color: rgba(123, 75, 37, 0.35);
+  border-color: rgb(var(--accent-rgb) / 0.35);
 }
 
 .menuItem strong {
@@ -291,7 +361,7 @@ main {
   border-radius: 999px;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff8ef;
+  color: var(--button-text);
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -352,19 +422,19 @@ main {
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--card-bg-strong);
   color: var(--text);
   font: inherit;
   resize: vertical;
 }
 
 .formField input:focus {
-  outline: 2px solid rgba(123, 75, 37, 0.2);
+  outline: 2px solid var(--focus-ring);
   border-color: var(--accent);
 }
 
 .formField textarea:focus {
-  outline: 2px solid rgba(123, 75, 37, 0.2);
+  outline: 2px solid var(--focus-ring);
   border-color: var(--accent);
 }
 
@@ -441,8 +511,8 @@ main {
 
 .quantityButton:hover {
   transform: translateY(-1px);
-  border-color: rgba(123, 75, 37, 0.35);
-  background: rgba(255, 248, 238, 1);
+  border-color: rgb(var(--accent-rgb) / 0.35);
+  background: var(--panel);
 }
 
 .quantityValue {
@@ -468,8 +538,8 @@ main {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: rgba(255, 253, 250, 0.98);
-  box-shadow: 0 16px 32px rgba(55, 32, 16, 0.12);
+  background: var(--panel-strong);
+  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.12);
   backdrop-filter: blur(12px);
   z-index: 30;
 }
@@ -516,7 +586,7 @@ main {
   padding: 16px;
   border-radius: 16px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--card-bg);
 }
 
 .adminAlertPopup {
@@ -525,7 +595,7 @@ main {
   bottom: 16px;
   z-index: 40;
   width: min(420px, calc(100vw - 32px));
-  box-shadow: 0 18px 40px rgba(55, 32, 16, 0.18);
+  box-shadow: 0 18px 40px rgb(var(--shadow-rgb) / 0.18);
   backdrop-filter: blur(12px);
 }
 
@@ -626,7 +696,7 @@ main {
 
 .loadingLine {
   border-radius: 999px;
-  background: rgba(123, 75, 37, 0.12);
+  background: rgb(var(--accent-rgb) / 0.12);
 }
 
 .loadingLineTitle {
@@ -669,6 +739,46 @@ main {
   animation: pulse 1.2s ease-in-out infinite;
 }
 
+.themeToggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 16px 36px rgb(var(--shadow-rgb) / 0.12);
+  backdrop-filter: blur(14px);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.themeToggle:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--accent-rgb) / 0.35);
+}
+
+.themeToggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  border-color: var(--accent);
+}
+
+.themeToggleIcon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
 @keyframes buttonSpin {
   to {
     transform: rotate(360deg);
@@ -691,6 +801,17 @@ main {
   50% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes customerBrandGlow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
   }
 }
 
@@ -731,6 +852,7 @@ main {
     width: min(720px, calc(100vw - 40px));
   }
 }
+
 
 @media (min-width: 900px) {
   .heroHeaderRow {
