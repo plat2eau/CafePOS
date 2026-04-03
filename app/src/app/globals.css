@@ -802,6 +802,157 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   margin-top: 18px;
 }
 
+.receiptPageShell {
+  width: min(640px, calc(100% - 24px));
+}
+
+.receiptActionBar {
+  width: min(420px, 100%);
+  margin: 0 auto;
+}
+
+.receiptPaperCard {
+  width: min(420px, 100%);
+  margin: 0 auto;
+  padding: 28px 26px 32px;
+  border: 1px solid #d8d2c9;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  box-shadow: 0 16px 40px rgb(var(--shadow-rgb) / 0.12);
+}
+
+.receiptPaperCard p {
+  color: #46403a;
+}
+
+.receiptHeader {
+  text-align: center;
+}
+
+.receiptHeader h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.5rem);
+  line-height: 1;
+}
+
+.receiptHeader p {
+  margin: 8px 0 0;
+  font-size: 1rem;
+}
+
+.receiptMetaBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receiptRule {
+  margin: 18px 0;
+  border-top: 3px dotted #444;
+}
+
+.receiptOrderBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.receiptOrderHeader {
+  font-size: 0.95rem;
+}
+
+.receiptItemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.receiptItemsTable th,
+.receiptItemsTable td {
+  padding: 6px 0;
+  vertical-align: top;
+}
+
+.receiptItemsTable th {
+  color: #5c5349;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.receiptItemsTable th:nth-child(2),
+.receiptItemsTable td:nth-child(2) {
+  width: 52px;
+  text-align: center;
+}
+
+.receiptItemsTable th:nth-child(3),
+.receiptItemsTable td:nth-child(3) {
+  width: 92px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.receiptNote {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.receiptOrderTotal {
+  padding-top: 12px;
+  border-top: 1px solid #d7d0c7;
+}
+
+.receiptGrandTotal {
+  padding-top: 0;
+  font-size: 1.1rem;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+
+  main {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .receiptPageShell {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .receiptActionBar,
+  .themeToggle {
+    display: none !important;
+  }
+
+  .receiptPaperCard {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 18px 16px 22px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .receiptHeader h1 {
+    font-size: 2rem;
+  }
+
+  .receiptRule {
+    margin: 14px 0;
+  }
+}
+
 .popupCloseButton {
   border: 0;
   padding: 0;

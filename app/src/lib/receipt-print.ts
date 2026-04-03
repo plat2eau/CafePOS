@@ -1,7 +1,7 @@
 import type { AdminOrder, AdminTableDetailData } from '@/lib/admin-data'
 
 export const cafeReceiptHeader = {
-  name: 'CafePOS',
+  name: "Cheekoo's Cafe",
   address: 'Tanda, Kangra, HP',
   phone: '8629822304'
 } as const
@@ -76,6 +76,7 @@ export function buildReceiptPayload({
 }
 
 export function buildBluetoothPrintJson(payload: ReceiptPayload) {
+  const separator = '--------------------------------'
   const lines: Array<Record<string, number | string>> = [
     {
       type: 0,
@@ -100,6 +101,13 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
     },
     {
       type: 0,
+      content: separator,
+      bold: 0,
+      align: 1,
+      format: 0
+    },
+    {
+      type: 0,
       content: `Printed ${formatReceiptTimestamp(payload.generatedAt)}`,
       bold: 0,
       align: 1,
@@ -118,6 +126,13 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
       bold: 1,
       align: 0,
       format: 0
+    },
+    {
+      type: 0,
+      content: separator,
+      bold: 0,
+      align: 1,
+      format: 0
     }
   ]
 
@@ -130,10 +145,21 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
       format: 0
     })
 
+    lines.push({
+      type: 0,
+      content: 'Item            Qty      Price',
+      bold: 1,
+      align: 0,
+      format: 4
+    })
+
     for (const item of order.items) {
+      const truncatedName =
+        item.name.length > 14 ? `${item.name.slice(0, 13).trimEnd()}.` : item.name
+
       lines.push({
         type: 0,
-        content: `${item.name} x ${item.quantity}  ${toReceiptPrice(item.lineTotalCents)}`,
+        content: `${truncatedName.padEnd(14)}${String(item.quantity).padStart(5)}${toReceiptPrice(item.lineTotalCents).padStart(11)}`,
         bold: 0,
         align: 0,
         format: 0
@@ -154,7 +180,15 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
       type: 0,
       content: `Order total  ${toReceiptPrice(order.totalCents)}`,
       bold: 1,
-      align: 0,
+      align: 2,
+      format: 0
+    })
+
+    lines.push({
+      type: 0,
+      content: separator,
+      bold: 0,
+      align: 1,
       format: 0
     })
   }
@@ -169,10 +203,17 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
     },
     {
       type: 0,
+      content: separator,
+      bold: 0,
+      align: 1,
+      format: 0
+    },
+    {
+      type: 0,
       content: `Grand total  ${toReceiptPrice(payload.grandTotalCents)}`,
       bold: 1,
-      align: 0,
-      format: 2
+      align: 2,
+      format: 0
     }
   )
 

@@ -30,56 +30,71 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
 
   return (
     <main>
-      <section className="hero heroShell">
-        <div className="heroHeader compact">
-          <p className="eyebrow">Receipt</p>
-          <h1>{cafeReceiptHeader.name}</h1>
-          <p className="lead">
-            {cafeReceiptHeader.address}
-            <br />
-            {cafeReceiptHeader.phone}
-          </p>
+      <section className="hero heroShell receiptPageShell">
+        <div className="receiptActionBar">
+          <ReceiptPrintActions responsePath={responsePath} />
         </div>
 
-        <ReceiptPrintActions responsePath={responsePath} />
+        <article className="receiptPaperCard">
+          <header className="receiptHeader">
+            <h1>{cafeReceiptHeader.name}</h1>
+            <p>{cafeReceiptHeader.address}</p>
+            <p>{cafeReceiptHeader.phone}</p>
+          </header>
 
-        <article className="card sessionGateCard">
-          <div className="summaryRow">
-            <strong>Guest</strong>
-            <span>{payload.guestName}</span>
+          <div className="receiptRule" />
+
+          <div className="receiptMetaBlock">
+            <div className="summaryRow">
+              <strong>Guest</strong>
+              <span>{payload.guestName}</span>
+            </div>
+            <div className="summaryRow">
+              <strong>Printed</strong>
+              <span>{formatReceiptTimestamp(payload.generatedAt)}</span>
+            </div>
           </div>
-          <div className="summaryRow total">
-            <strong>Printed</strong>
-            <span>{formatReceiptTimestamp(payload.generatedAt)}</span>
-          </div>
+
+          <div className="receiptRule" />
 
           <div className="stack">
             {payload.orders.map((order) => (
-              <div className="adminOrderCard" key={order.id}>
-                <div className="summaryRow">
+              <section className="receiptOrderBlock" key={order.id}>
+                <div className="summaryRow receiptOrderHeader">
                   <strong>Order {order.id.slice(0, 8)}</strong>
                   <span>{formatReceiptTimestamp(order.createdAt)}</span>
                 </div>
-                <div className="stack">
-                  {order.items.map((item, index) => (
-                    <div className="summaryRow" key={`${order.id}-${index}`}>
-                      <span>
-                        {item.name} x {item.quantity}
-                      </span>
-                      <strong>{toReceiptPrice(item.lineTotalCents)}</strong>
-                    </div>
-                  ))}
-                </div>
-                {order.note ? <p>Note: {order.note}</p> : null}
-                <div className="summaryRow total">
+                <table className="receiptItemsTable">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Qty</th>
+                      <th>Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.items.map((item, index) => (
+                      <tr key={`${order.id}-${index}`}>
+                        <td>{item.name}</td>
+                        <td>{item.quantity}</td>
+                        <td>{toReceiptPrice(item.lineTotalCents)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {order.note ? <p className="receiptNote">Note: {order.note}</p> : null}
+                <div className="summaryRow receiptOrderTotal">
                   <span>Order total</span>
                   <strong>{toReceiptPrice(order.totalCents)}</strong>
                 </div>
-              </div>
+                <div className="receiptRule" />
+              </section>
             ))}
           </div>
 
-          <div className="summaryRow total">
+          <div className="receiptRule" />
+
+          <div className="summaryRow receiptGrandTotal">
             <strong>Grand total</strong>
             <strong>{toReceiptPrice(payload.grandTotalCents)}</strong>
           </div>
