@@ -24,10 +24,15 @@ export type ReceiptPayload = {
   generatedAt: string
   guestName: string
   orders: ReceiptPayloadOrder[]
+  subtotalCents: number
+  discountPercentage: number | null
+  discountAmountCents: number | null
   grandTotalCents: number
 }
 
-type BuildReceiptPayloadOptions = Pick<AdminTableDetailData, 'activeSession' | 'recentOrders'>
+type BuildReceiptPayloadOptions = Pick<AdminTableDetailData, 'activeSession' | 'recentOrders'> & {
+  discountPercentage?: number | null
+}
 
 export function toReceiptPrice(priceCents: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -47,7 +52,8 @@ export function formatReceiptTimestamp(value: string) {
 
 export function buildReceiptPayload({
   activeSession,
-  recentOrders
+  recentOrders,
+  discountPercentage
 }: BuildReceiptPayloadOptions): ReceiptPayload | null {
   if (!activeSession) {
     return null
@@ -56,6 +62,15 @@ export function buildReceiptPayload({
   const orderedOrders = [...recentOrders].sort(
     (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
   )
+
+  const subtotalCents = orderedOrders.reduce((sum, order) => sum + order.total_cents, 0)
+  const normalizedDiscountPercentage =
+    typeof discountPercentage === 'number' && Number.isFinite(discountPercentage) && discountPercentage > 0
+      ? Math.min(discountPercentage, 100)
+      : null
+  const discountAmountCents = normalizedDiscountPercentage
+    ? Math.round((subtotalCents * normalizedDiscountPercentage) / 100)
+    : null
 
   return {
     generatedAt: new Date().toISOString(),
@@ -71,7 +86,10 @@ export function buildReceiptPayload({
         lineTotalCents: item.line_total_cents
       }))
     })),
-    grandTotalCents: orderedOrders.reduce((sum, order) => sum + order.total_cents, 0)
+    subtotalCents,
+    discountPercentage: normalizedDiscountPercentage,
+    discountAmountCents,
+    grandTotalCents: subtotalCents - (discountAmountCents ?? 0)
   }
 }
 
@@ -208,6 +226,17 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
       align: 1,
       format: 0
     },
+    ...(payload.discountPercentage && payload.discountAmountCents
+      ? [
+          {
+            type: 0,
+            content: `Discount (${payload.discountPercentage}%)  -${toReceiptPrice(payload.discountAmountCents)}`,
+            bold: 0,
+            align: 2,
+            format: 0
+          } satisfies Record<string, number | string>
+        ]
+      : []),
     {
       type: 0,
       content: `Grand total  ${toReceiptPrice(payload.grandTotalCents)}`,
@@ -230,6 +259,7 @@ export function isReceiptPayload(value: unknown): value is ReceiptPayload {
   return (
     typeof candidate.generatedAt === 'string' &&
     typeof candidate.guestName === 'string' &&
+    typeof candidate.subtotalCents === 'number' &&
     typeof candidate.grandTotalCents === 'number' &&
     Array.isArray(candidate.orders)
   )

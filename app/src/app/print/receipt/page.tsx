@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import ReceiptPrintActions from '@/components/ReceiptPrintActions'
 import {
@@ -6,6 +7,7 @@ import {
   toReceiptPrice
 } from '@/lib/receipt-print'
 import { verifyReceiptToken } from '@/lib/receipt-print-server'
+import receiptQrImage from '../../../../recipt qr.png'
 
 type ReceiptPageProps = {
   searchParams: Promise<{
@@ -49,8 +51,8 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
               <strong>Guest</strong>
               <span>{payload.guestName}</span>
             </div>
-            <div className="summaryRow">
-              <strong>Printed</strong>
+            <div className="summaryRow receiptDateRow">
+              <strong>Date:</strong>
               <span>{formatReceiptTimestamp(payload.generatedAt)}</span>
             </div>
           </div>
@@ -62,7 +64,6 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
               <section className="receiptOrderBlock" key={order.id}>
                 <div className="summaryRow receiptOrderHeader">
                   <strong>Order {order.id.slice(0, 8)}</strong>
-                  <span>{formatReceiptTimestamp(order.createdAt)}</span>
                 </div>
                 <table className="receiptItemsTable">
                   <thead>
@@ -94,9 +95,30 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
 
           <div className="receiptRule" />
 
+          {payload.discountPercentage && payload.discountAmountCents ? (
+            <>
+              <div className="summaryRow receiptDiscountRow">
+                <span>Discount ({payload.discountPercentage}%)</span>
+                <strong>-{toReceiptPrice(payload.discountAmountCents)}</strong>
+              </div>
+              <div className="receiptRule" />
+            </>
+          ) : null}
+
           <div className="summaryRow receiptGrandTotal">
             <strong>Grand total</strong>
             <strong>{toReceiptPrice(payload.grandTotalCents)}</strong>
+          </div>
+
+          <div className="receiptRule" />
+
+          <div className="receiptQrBlock">
+            <Image
+              src={receiptQrImage}
+              alt="Linktree QR code for Cheekoo's Cafe"
+              className="receiptQrImage"
+              priority
+            />
           </div>
         </article>
       </section>

@@ -847,6 +847,15 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   gap: 8px;
 }
 
+.receiptDateRow {
+  font-size: 1.05rem;
+}
+
+.receiptDateRow strong,
+.receiptDateRow span {
+  color: #2a2520;
+}
+
 .receiptRule {
   margin: 18px 0;
   border-top: 3px dotted #444;
@@ -909,6 +918,21 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   font-size: 1.1rem;
 }
 
+.receiptDiscountRow {
+  font-size: 0.98rem;
+}
+
+.receiptQrBlock {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.receiptQrImage {
+  width: min(220px, 100%);
+  height: auto;
+}
+
 @media print {
   html,
   body {
@@ -950,6 +974,10 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
   .receiptRule {
     margin: 14px 0;
+  }
+
+  .receiptQrBlock {
+    margin-top: 14px;
   }
 }
 

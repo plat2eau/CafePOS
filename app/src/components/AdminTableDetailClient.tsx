@@ -54,6 +54,7 @@ export default function AdminTableDetailClient({
   const [isClearingTable, setIsClearingTable] = useState(false)
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false)
   const [isOpeningReceipt, setIsOpeningReceipt] = useState(false)
+  const [discountPercentage, setDiscountPercentage] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -181,6 +182,7 @@ export default function AdminTableDetailClient({
     setActiveSession(null)
     setServiceRequests([])
     setIsClearDialogOpen(false)
+    setDiscountPercentage('')
     setFlash({
       tone: 'success',
       message: payload?.message ?? 'Table session cleared.'
@@ -198,7 +200,9 @@ export default function AdminTableDetailClient({
 
     const payload = buildReceiptPayload({
       activeSession,
-      recentOrders
+      recentOrders,
+      discountPercentage:
+        discountPercentage.trim() === '' ? null : Number.parseFloat(discountPercentage)
     })
 
     if (!payload) {
@@ -367,6 +371,7 @@ export default function AdminTableDetailClient({
                       disabled={isClearingTable}
                       aria-busy={isClearingTable}
                       onClick={() => {
+                        setDiscountPercentage('')
                         setIsClearDialogOpen(true)
                       }}
                     >
@@ -495,6 +500,21 @@ export default function AdminTableDetailClient({
                   {toPrice(recentOrders.reduce((sum, order) => sum + order.total_cents, 0))}
                 </strong>
               </div>
+            </div>
+            <div className="formField">
+              <label htmlFor="receipt-discount">Discount %</label>
+              <input
+                id="receipt-discount"
+                name="receipt-discount"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="Optional"
+                value={discountPercentage}
+                onChange={(event) => setDiscountPercentage(event.target.value)}
+              />
             </div>
             <div className="dialogActions">
               <button
