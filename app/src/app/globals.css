@@ -760,6 +760,62 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   display: flex;
 }
 
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(var(--shadow-rgb) / 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.dialogCard {
+  width: min(520px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: clamp(20px, 3vw, 28px);
+  background:
+    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.08), transparent 36%),
+    var(--panel-strong);
+  box-shadow: 0 20px 44px rgb(var(--shadow-rgb) / 0.24);
+}
+
+.dialogCard h2 {
+  margin: 0;
+}
+
+.dialogSummary {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
+}
+
+.dialogActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.popupCloseButton {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.popupCloseButton:hover {
+  color: var(--accent);
+}
+
 .statusChip {
   display: inline-flex;
   align-items: center;

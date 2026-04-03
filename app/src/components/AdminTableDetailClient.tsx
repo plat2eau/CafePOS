@@ -38,6 +38,15 @@ function formatTimestamp(value: string) {
   }).format(new Date(value))
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 export default function AdminTableDetailClient({
   tableId,
   signedInLabel,
@@ -51,6 +60,7 @@ export default function AdminTableDetailClient({
   const [flash, setFlash] = useState<FlashMessage | null>(null)
   const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null)
   const [isClearingTable, setIsClearingTable] = useState(false)
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -177,11 +187,215 @@ export default function AdminTableDetailClient({
 
     setActiveSession(null)
     setServiceRequests([])
+    setIsClearDialogOpen(false)
     setFlash({
       tone: 'success',
       message: payload?.message ?? 'Table session cleared.'
     })
     setIsClearingTable(false)
+  }
+
+  function buildReceiptHtml() {
+    if (!activeSession) {
+      return ''
+    }
+
+    const orderedOrders = [...recentOrders].sort(
+      (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+    )
+    const grandTotalCents = orderedOrders.reduce((sum, order) => sum + order.total_cents, 0)
+    const orderMarkup = orderedOrders
+      .map((order) => {
+        const itemsMarkup = order.items
+          .map(
+            (item) => `
+              <tr>
+                <td>${escapeHtml(item.item_name)} x ${item.quantity}</td>
+                <td class="amount">${toPrice(item.line_total_cents)}</td>
+              </tr>
+            `
+          )
+          .join('')
+
+        const noteMarkup = order.note
+          ? `<p class="note">Note: ${escapeHtml(order.note)}</p>`
+          : ''
+
+        return `
+          <section class="order">
+            <div class="row">
+              <strong>Order ${escapeHtml(order.id.slice(0, 8))}</strong>
+              <span>${escapeHtml(formatTimestamp(order.created_at))}</span>
+            </div>
+            <table>
+              <tbody>${itemsMarkup}</tbody>
+            </table>
+            ${noteMarkup}
+            <div class="row total">
+              <strong>Order total</strong>
+              <strong>${toPrice(order.total_cents)}</strong>
+            </div>
+          </section>
+        `
+      })
+      .join('')
+
+    return `
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Receipt</title>
+          <style>
+            :root {
+              color-scheme: light;
+            }
+
+            body {
+              margin: 0;
+              padding: 16px;
+              background: #fff;
+              color: #111;
+              font-family: "Courier New", Courier, monospace;
+              font-size: 12px;
+              line-height: 1.45;
+            }
+
+            .receipt {
+              width: min(320px, 100%);
+              margin: 0 auto;
+            }
+
+            h1,
+            h2,
+            p {
+              margin: 0;
+            }
+
+            .center {
+              text-align: center;
+            }
+
+            .muted {
+              color: #444;
+            }
+
+            .section {
+              padding: 12px 0;
+              border-bottom: 1px dashed #888;
+            }
+
+            .order {
+              padding: 10px 0;
+              border-bottom: 1px dashed #bbb;
+            }
+
+            .row {
+              display: flex;
+              justify-content: space-between;
+              gap: 12px;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 8px;
+            }
+
+            td {
+              padding: 2px 0;
+              vertical-align: top;
+            }
+
+            .amount {
+              text-align: right;
+              white-space: nowrap;
+            }
+
+            .note {
+              margin-top: 6px;
+            }
+
+            .total {
+              margin-top: 8px;
+              padding-top: 8px;
+              border-top: 1px dashed #bbb;
+            }
+
+            @media print {
+              body {
+                padding: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <main class="receipt">
+            <section class="section center">
+              <h1>CafePOS</h1>
+              <p>Tanda, Kangra, HP</p>
+              <p>8629822304</p>
+              <p class="muted">Printed ${escapeHtml(formatTimestamp(new Date().toISOString()))}</p>
+            </section>
+            <section class="section">
+              <div class="row">
+                <strong>Guest</strong>
+                <span>${escapeHtml(activeSession.guest_name)}</span>
+              </div>
+            </section>
+            <section class="section">
+              ${orderMarkup || '<p>No billable orders found.</p>'}
+            </section>
+            <section class="section">
+              <div class="row total">
+                <strong>Grand total</strong>
+                <strong>${toPrice(grandTotalCents)}</strong>
+              </div>
+            </section>
+          </main>
+          <script>
+            window.addEventListener('load', () => {
+              window.print()
+            })
+          </script>
+        </body>
+      </html>
+    `
+  }
+
+  function printReceipt() {
+    const receiptHtml = buildReceiptHtml()
+    const receiptBlob = new Blob([receiptHtml], {
+      type: 'text/html;charset=utf-8'
+    })
+    const receiptUrl = window.URL.createObjectURL(receiptBlob)
+    const receiptWindow = window.open(receiptUrl, '_blank')
+
+    if (!receiptWindow) {
+      window.URL.revokeObjectURL(receiptUrl)
+      return false
+    }
+
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(receiptUrl)
+    }, 60_000)
+
+    return true
+  }
+
+  function handleOpenReceipt() {
+    setFlash(null)
+
+    const printStarted = printReceipt()
+
+    if (!printStarted) {
+      setFlash({
+        tone: 'error',
+        message: 'Receipt page was blocked. Allow pop-ups and try again.'
+      })
+      return
+    }
   }
 
   function renderStatusButton(order: AdminOrder, status: OrderStatus) {
@@ -289,7 +503,9 @@ export default function AdminTableDetailClient({
                       type="button"
                       disabled={isClearingTable}
                       aria-busy={isClearingTable}
-                      onClick={() => void handleClearTable()}
+                      onClick={() => {
+                        setIsClearDialogOpen(true)
+                      }}
                     >
                       {isClearingTable ? (
                         <>
@@ -377,6 +593,83 @@ export default function AdminTableDetailClient({
           </article>
         </>
       )}
+
+      {isClearDialogOpen && activeSession ? (
+        <div
+          className="dialogBackdrop"
+          role="presentation"
+          onClick={() => {
+            if (!isClearingTable) {
+              setIsClearDialogOpen(false)
+            }
+          }}
+        >
+          <div
+            className="dialogCard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-table-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="eyebrow">Close session</p>
+            <h2 id="clear-table-dialog-title">Open receipt before clearing the table?</h2>
+            <p className="finePrint">
+              Open the HTML receipt page first, then clear the table only after printing or sharing
+              it.
+            </p>
+            <div className="dialogSummary">
+              <div className="summaryRow">
+                <span>Guest</span>
+                <strong>{activeSession.guest_name}</strong>
+              </div>
+              <div className="summaryRow">
+                <span>Orders</span>
+                <strong>{recentOrders.length}</strong>
+              </div>
+              <div className="summaryRow total">
+                <span>Total</span>
+                <strong>
+                  {toPrice(recentOrders.reduce((sum, order) => sum + order.total_cents, 0))}
+                </strong>
+              </div>
+            </div>
+            <div className="dialogActions">
+              <button
+                className="button"
+                type="button"
+                disabled={isClearingTable}
+                onClick={handleOpenReceipt}
+              >
+                Open receipt
+              </button>
+              <button
+                className={`button buttonSecondary${isClearingTable ? ' buttonLoading' : ''}`}
+                type="button"
+                disabled={isClearingTable}
+                aria-busy={isClearingTable}
+                onClick={() => void handleClearTable()}
+              >
+                {isClearingTable ? (
+                  <>
+                    <span className="buttonSpinner" aria-hidden="true" />
+                    Clear table
+                  </>
+                ) : (
+                  'Clear table'
+                )}
+              </button>
+              <button
+                className="button buttonSecondary"
+                type="button"
+                disabled={isClearingTable}
+                onClick={() => setIsClearDialogOpen(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

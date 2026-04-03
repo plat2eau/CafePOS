@@ -11,6 +11,9 @@ type AdminGlobalNotifierProps = {
 const defaultNotificationSoundSrc = '/soundreality-telephone-ring-129620.mp3'
 const notificationSoundSrc =
   process.env.NEXT_PUBLIC_ADMIN_ALERT_SOUND_PATH?.trim() || defaultNotificationSoundSrc
+const seenNoticeStorageKey = 'cafepos-admin-seen-notices'
+const soundPromptDismissedStorageKey = 'cafepos-admin-sound-prompt-dismissed'
+const soundReadyStorageKey = 'cafepos-admin-sound-ready'
 
 type Notice = {
   id: string
@@ -57,9 +60,11 @@ export default function AdminGlobalNotifier({
   const [isSoundReady, setIsSoundReady] = useState(false)
   const [isTestingSound, setIsTestingSound] = useState(false)
   const [soundStatusMessage, setSoundStatusMessage] = useState<string | null>(null)
+  const [isSoundPromptDismissed, setIsSoundPromptDismissed] = useState(false)
   const initializedRef = useRef(false)
   const seenOrderIdsRef = useRef<Set<string>>(new Set())
   const seenServiceRequestIdsRef = useRef<Set<string>>(new Set())
+  const seenNoticeIdsRef = useRef<Set<string>>(new Set())
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
 
@@ -82,6 +87,32 @@ export default function AdminGlobalNotifier({
       audioElementRef.current = createAudioElement(notificationSoundSrc)
     }
   }, [createAudioElement])
+
+  useEffect(() => {
+    const storedSeenNotices = window.sessionStorage.getItem(seenNoticeStorageKey)
+
+    if (storedSeenNotices) {
+      try {
+        const parsed = JSON.parse(storedSeenNotices) as string[]
+        seenNoticeIdsRef.current = new Set(parsed)
+      } catch {
+        window.sessionStorage.removeItem(seenNoticeStorageKey)
+      }
+    }
+
+    if (window.sessionStorage.getItem(soundReadyStorageKey) === 'true') {
+      setIsSoundReady(true)
+    }
+
+    if (window.sessionStorage.getItem(soundPromptDismissedStorageKey) === 'true') {
+      setIsSoundPromptDismissed(true)
+    }
+  }, [])
+
+  function persistSeenNoticeIds(nextIds: Set<string>) {
+    seenNoticeIdsRef.current = nextIds
+    window.sessionStorage.setItem(seenNoticeStorageKey, JSON.stringify(Array.from(nextIds)))
+  }
 
   useEffect(() => {
     function warmUpAudio() {
@@ -203,9 +234,11 @@ export default function AdminGlobalNotifier({
       const newOrderNotices = nextData.orders
         .filter((order) => !seenOrderIdsRef.current.has(order.id))
         .map(buildOrderNotice)
+        .filter((notice) => !seenNoticeIdsRef.current.has(notice.id))
       const newServiceNotices = nextData.serviceRequests
         .filter((request) => !seenServiceRequestIdsRef.current.has(request.id))
         .map(buildServiceNotice)
+        .filter((notice) => !seenNoticeIdsRef.current.has(notice.id))
 
       seenOrderIdsRef.current = nextOrderIds
       seenServiceRequestIdsRef.current = nextServiceIds
@@ -216,6 +249,13 @@ export default function AdminGlobalNotifier({
         return
       }
 
+      const persistedNoticeIds = new Set(seenNoticeIdsRef.current)
+
+      for (const notice of nextNotices) {
+        persistedNoticeIds.add(notice.id)
+      }
+
+      persistSeenNoticeIds(persistedNoticeIds)
       setNotices((current) => [...nextNotices, ...current].slice(0, 4))
       void playNotificationSound()
     }
@@ -245,6 +285,13 @@ export default function AdminGlobalNotifier({
 
   function dismissNotice(id: string) {
     setNotices((current) => current.filter((notice) => notice.id !== id))
+  }
+
+  function dismissSoundPrompt() {
+    stopTestingSound()
+    setSoundStatusMessage(null)
+    setIsSoundPromptDismissed(true)
+    window.sessionStorage.setItem(soundPromptDismissedStorageKey, 'true')
   }
 
   function stopTestingSound() {
@@ -291,18 +338,31 @@ export default function AdminGlobalNotifier({
   function confirmSoundReady() {
     stopTestingSound()
     setIsSoundReady(true)
+    setIsSoundPromptDismissed(true)
+    window.sessionStorage.setItem(soundReadyStorageKey, 'true')
+    window.sessionStorage.setItem(soundPromptDismissedStorageKey, 'true')
     setSoundStatusMessage('Alert sound enabled.')
   }
 
-  if (notices.length === 0 && isSoundReady) {
+  if (notices.length === 0 && (isSoundReady || isSoundPromptDismissed)) {
     return null
   }
 
   return (
     <div className="adminNotifierStack" aria-live="polite" aria-atomic="false">
-      {!isSoundReady ? (
+      {!isSoundReady && !isSoundPromptDismissed ? (
         <article className="card supportCard adminAlertPopup">
-          <p className="eyebrow">Alert sound</p>
+          <div className="summaryRow">
+            <p className="eyebrow">Alert sound</p>
+            <button
+              className="popupCloseButton"
+              type="button"
+              aria-label="Close alert sound prompt"
+              onClick={dismissSoundPrompt}
+            >
+              Close
+            </button>
+          </div>
           <h2>Enable notification sound</h2>
           <p>Browsers often require one manual tap before new-order sounds can play automatically.</p>
           <div className="buttonRow">
