@@ -26,6 +26,8 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
     notFound()
   }
 
+  const responsePath = `/api/print/receipt?token=${encodeURIComponent(token)}`
+
   return (
     <main>
       <section className="hero heroShell">
@@ -39,7 +41,7 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
           </p>
         </div>
 
-        <ReceiptPrintActions token={token} />
+        <ReceiptPrintActions responsePath={responsePath} />
 
         <article className="card sessionGateCard">
           <div className="summaryRow">

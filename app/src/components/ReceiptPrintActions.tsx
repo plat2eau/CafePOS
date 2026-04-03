@@ -1,30 +1,38 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useState } from 'react'
 
 type ReceiptPrintActionsProps = {
-  token: string
+  responsePath: string
 }
 
-export default function ReceiptPrintActions({ token }: ReceiptPrintActionsProps) {
-  const bluetoothPrintHref = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return '#'
-    }
+export default function ReceiptPrintActions({ responsePath }: ReceiptPrintActionsProps) {
+  const [launchMessage, setLaunchMessage] = useState<string | null>(null)
 
-    const responseUrl = new URL('/api/print/receipt', window.location.origin)
-    responseUrl.searchParams.set('token', token)
-    return `my.bluetoothprint.scheme://${responseUrl.toString()}`
-  }, [token])
+  function handleBluetoothPrintLaunch() {
+    setLaunchMessage('If nothing opens, try this page in Android Chrome instead of the installed app.')
+    const responseUrl = new URL(responsePath, window.location.origin)
+    window.location.href = `my.bluetoothprint.scheme://${responseUrl.toString()}`
+  }
 
   return (
-    <div className="buttonRow">
-      <a className="button" href={bluetoothPrintHref}>
-        Print with Bluetooth Print app
-      </a>
+    <div className="sectionStack compact">
+      <div className="buttonRow">
+        <button className="button" type="button" onClick={handleBluetoothPrintLaunch}>
+          Print with Bluetooth Print app
+        </button>
+        <a className="button buttonSecondary" href={responsePath} target="_blank" rel="noreferrer">
+          Open debug JSON
+        </a>
+      </div>
       <button className="button buttonSecondary" type="button" onClick={() => window.print()}>
         Browser print
       </button>
+      {launchMessage ? <p className="finePrint">{launchMessage}</p> : null}
+      <p className="finePrint">
+        Android only. If the Bluetooth Print app does not open, try this receipt page in Chrome,
+        not the installed PWA.
+      </p>
     </div>
   )
 }
