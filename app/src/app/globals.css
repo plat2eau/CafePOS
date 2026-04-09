@@ -924,8 +924,13 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
 .receiptQrBlock {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  margin-top: 18px;
+  gap: 8px;
+  margin-top: 6px;
+  padding-bottom: 14px;
+  text-align: center;
 }
 
 .receiptQrImage {
@@ -977,7 +982,8 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   }
 
   .receiptQrBlock {
-    margin-top: 14px;
+    margin-top: 4px;
+    padding-bottom: 12px;
   }
 }
 

@@ -227,13 +227,6 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
   lines.push(
     {
       type: 0,
-      content: ' ',
-      bold: 0,
-      align: 0,
-      format: 0
-    },
-    {
-      type: 0,
       content: separator,
       bold: 0,
       align: 1,
@@ -265,10 +258,31 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
       format: 0
     },
     {
+      type: 0,
+      content: 'Scan this QR code to pay your bill.',
+      bold: 0,
+      align: 1,
+      format: 0
+    },
+    {
       type: 3,
       value: qrValue,
       size: 30,
       align: 1
+    },
+    {
+      type: 0,
+      content: ' ',
+      bold: 0,
+      align: 0,
+      format: 0
+    },
+    {
+      type: 0,
+      content: ' ',
+      bold: 0,
+      align: 0,
+      format: 0
     }
   )
 

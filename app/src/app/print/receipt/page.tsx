@@ -118,6 +118,7 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
           <div className="receiptRule" />
 
           <div className="receiptQrBlock">
+            <p>Scan this QR code to pay your bill.</p>
             <Image
               src={qrCodeDataUrl}
               alt="Receipt QR code"
