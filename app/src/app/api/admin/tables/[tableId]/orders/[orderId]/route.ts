@@ -60,6 +60,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     )
   }
 
+  revalidatePath('/admin')
   revalidatePath('/admin/sessions')
   revalidatePath(`/admin/sessions/${tableId}`)
   revalidatePath('/api/admin/overview')

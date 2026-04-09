@@ -277,6 +277,7 @@ export async function placeOrderForTable(
 
   revalidatePath(`/table/${tableId}`)
   revalidatePath(`/table/${tableId}/orders`)
+  revalidatePath('/admin')
   revalidatePath('/admin/sessions')
   revalidatePath(`/admin/sessions/${tableId}`)
 
@@ -351,6 +352,7 @@ export async function createServiceRequestForTable(
     .eq('id', session.id)
 
   revalidatePath(`/table/${tableId}`)
+  revalidatePath('/admin')
   revalidatePath('/admin/sessions')
   revalidatePath(`/admin/sessions/${tableId}`)
 

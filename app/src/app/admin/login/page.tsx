@@ -13,7 +13,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
   const auth = await getAdminAuthContext()
 
   if (auth) {
-    redirect('/admin/sessions')
+    redirect('/admin')
   }
 
   const { error } = await searchParams
@@ -22,8 +22,8 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
     <main>
       <section className="hero heroShell">
         <div className="heroHeader compact">
-          <Link className="backLink" href="/">
-            ← Back to home
+          <Link className="backLink" href="/admin">
+            ← Back to admin
           </Link>
           <p className="eyebrow">Admin Auth</p>
           <h1>Staff login</h1>

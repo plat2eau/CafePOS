@@ -11,7 +11,9 @@ export function middleware(request: NextRequest) {
       request.cookies.get(refreshTokenCookieName)?.value
   )
 
-  if (pathname.startsWith('/admin/sessions') && !hasAdminSession) {
+  const isProtectedAdminPath = pathname === '/admin' || pathname.startsWith('/admin/sessions')
+
+  if (isProtectedAdminPath && !hasAdminSession) {
     const loginUrl = new URL('/admin/login', request.url)
     loginUrl.searchParams.set('error', 'unauthorized')
     return NextResponse.redirect(loginUrl)
@@ -21,5 +23,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/sessions/:path*']
+  matcher: ['/admin', '/admin/sessions/:path*']
 }

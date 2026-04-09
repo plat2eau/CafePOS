@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import type { AdminOrder, AdminOverviewData } from '@/lib/admin-data'
+import type { AdminOverviewData, AdminTableSummary } from '@/lib/admin-data'
 
 type AdminConsoleProps = {
   initialData: AdminOverviewData
@@ -24,6 +24,22 @@ function formatTimestamp(value: string) {
   }).format(new Date(value))
 }
 
+function getTableAttentionLabel(table: AdminTableSummary) {
+  if (table.hasPaymentRequest) {
+    return 'Needs payment'
+  }
+
+  if (table.hasAssistanceRequest) {
+    return 'Needs assistance'
+  }
+
+  if (table.hasUnservedOrders) {
+    return 'Orders in progress'
+  }
+
+  return null
+}
+
 export default function AdminConsole({ initialData }: AdminConsoleProps) {
   const [data, setData] = useState(initialData)
 
@@ -34,18 +50,17 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
       const response = await fetch('/api/admin/overview', {
         method: 'GET',
         cache: 'no-store'
-      })
+      }).catch(() => null)
 
-      if (!response.ok) {
+      if (!response || !response.ok || cancelled) {
         return
       }
 
       const nextData = (await response.json()) as AdminOverviewData
 
-      if (cancelled) {
-        return
+      if (!cancelled) {
+        setData(nextData)
       }
-      setData(nextData)
     }
 
     const interval = window.setInterval(refreshOverview, 5000)
@@ -56,113 +71,87 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
     }
   }, [])
 
-  const ordersByTable = useMemo(() => {
-    const map = new Map<string, AdminOrder[]>()
-
-    for (const order of data.orders) {
-      const list = map.get(order.table_id)
-      if (list) {
-        list.push(order)
-      } else {
-        map.set(order.table_id, [order])
-      }
-    }
-
-    return map
-  }, [data.orders])
+  const tableCountLabel = useMemo(() => {
+    const count = data.tables.length
+    return `${count} table${count === 1 ? '' : 's'}`
+  }, [data.tables.length])
 
   return (
-    <div className="sectionStack">
-      <div className="compactGrid">
-        <article className="card">
-          <p className="eyebrow">Active tables</p>
-          <h2>{data.sessions.length}</h2>
-          <p>Tables with an active guest session right now.</p>
-        </article>
-        <article className="card">
-          <p className="eyebrow">Recent orders</p>
-          <h2>{data.orders.length}</h2>
-          <p>Orders visible in the admin console feed.</p>
-        </article>
-        <article className="card">
-          <p className="eyebrow">Server calls</p>
-          <h2>{data.serviceRequests.length}</h2>
-          <p>Open payment or assistance requests from active tables.</p>
-        </article>
+    <section id="tables-grid" className="adminTablesColumn">
+      <div className="summaryRow adminGridHeader">
+        <div className="adminGridHeaderTitle">
+          <p className="eyebrow">Live floor</p>
+          <h2>Open tables</h2>
+        </div>
+        <div className="adminGridMeta">
+          <span className="metaPill">{tableCountLabel}</span>
+          <span className="metaPill">Updated {formatTimestamp(data.generatedAt)}</span>
+        </div>
       </div>
 
-      <div className="responsiveSplit">
-        <article className="card">
-          <p className="eyebrow">Live order feed</p>
-          <h2>Incoming orders</h2>
-          <p>Refreshes automatically every few seconds.</p>
+      {data.tables.length === 0 ? (
+        <article className="card supportCard adminEmptyState">
+          <p className="eyebrow">No open tables</p>
+          <h2>Nothing needs attention right now</h2>
+          <p>
+            When a guest opens a session, the table will appear here. New orders and service
+            requests will show as popup alerts.
+          </p>
+        </article>
+      ) : (
+        <div className="adminTableGrid">
+          {data.tables.map((table) => {
+            const attentionLabel = getTableAttentionLabel(table)
 
-          <div className="stack">
-            {data.orders.length === 0 ? (
-              <p>No orders yet.</p>
-            ) : (
-              data.orders.map((order) => (
-                <div className="adminOrderCard" key={order.id}>
-                  <div className="summaryRow">
-                    <strong>Table {order.table_id}</strong>
-                    <span>{formatTimestamp(order.created_at)}</span>
+            return (
+              <Link
+                className={`card adminTableCard adminTableCardLink${table.hasPaymentRequest ? ' attention-payment' : ''}${table.hasAssistanceRequest ? ' attention-assistance' : ''}${table.hasUnservedOrders ? ' attention-orders' : ''}`}
+                key={table.tableId}
+                href={`/admin/sessions/${table.tableId}`}
+              >
+                <div className="adminTableCardTopRight" aria-label="Table counters">
+                  <div className="adminCounterPill" title="Open orders">
+                    <span className="adminCounterIcon" aria-hidden="true">
+                      ◔
+                    </span>
+                    <span className="adminCounterCircle">{table.openOrderCount}</span>
                   </div>
-                  <p>
-                    {order.guest_name ?? 'Guest'} · {order.status}
-                  </p>
-                  <div className="stack">
-                    {order.items.map((item, index) => (
-                      <div className="summaryRow" key={`${order.id}-${index}`}>
-                        <span>
-                          {item.item_name} x {item.quantity}
-                        </span>
-                        <strong>{toPrice(item.line_total_cents)}</strong>
-                      </div>
-                    ))}
+                  <div className="adminCounterPill" title="Open requests">
+                    <span className="adminCounterIcon" aria-hidden="true">
+                      ⌁
+                    </span>
+                    <span className="adminCounterCircle">{table.openRequestCount}</span>
                   </div>
-                  {order.note ? <p>Note: {order.note}</p> : null}
-                  <div className="summaryRow total">
-                    <span>Total</span>
-                    <strong>{toPrice(order.total_cents)}</strong>
-                  </div>
-                  <Link className="button buttonSecondary" href={`/admin/sessions/${order.table_id}`}>
-                    Manage table
-                  </Link>
                 </div>
-              ))
-            )}
-          </div>
-        </article>
 
-        <article className="card supportCard">
-          <p className="eyebrow">Occupied tables</p>
-          <h2>Session overview</h2>
-          <div className="stack">
-            {data.sessions.length === 0 ? (
-              <p>No active table sessions.</p>
-            ) : (
-              data.sessions.map((session) => {
-                const orderCount = ordersByTable.get(session.table_id)?.length ?? 0
+                <div className="adminTableCardHeader">
+                  <p className="eyebrow">Table</p>
+                  <h2>{table.tableLabel}</h2>
+                  {attentionLabel ? <span className="statusChip">{attentionLabel}</span> : null}
+                </div>
 
-                return (
-                  <div className="adminSessionCard" key={session.id}>
-                    <div className="summaryRow">
-                      <strong>Table {session.table_id}</strong>
-                      <span>{orderCount} order{orderCount === 1 ? '' : 's'}</span>
-                    </div>
-                    <p>{session.guest_name}</p>
-                    <p>{session.guest_phone}</p>
-                    <p>Last active {formatTimestamp(session.last_active_at)}</p>
-                    <Link className="button buttonSecondary" href={`/admin/sessions/${session.table_id}`}>
-                      Open table
-                    </Link>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </article>
-      </div>
-    </div>
+                <div className="adminTableMeta">
+                  <p className="adminTableGuest adminClampTwoLines">{table.guestName}</p>
+                  <p className="adminTableSubtle adminClampOneLine">{table.guestPhone}</p>
+                  <p className="adminTableSubtle adminClampOneLine">
+                    Bill {toPrice(table.runningTotalCents)}
+                  </p>
+                  <p className="adminTableSubtle adminClampOneLine">
+                    Active {formatTimestamp(table.lastActiveAt)}
+                  </p>
+                </div>
+
+                <div className="adminTableCardFooter">
+                  <span className="adminTableOpenLabel">Open table</span>
+                  <span className="adminTableOpenArrow" aria-hidden="true">
+                    →
+                  </span>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }

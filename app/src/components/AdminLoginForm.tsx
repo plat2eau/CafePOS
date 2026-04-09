@@ -61,7 +61,7 @@ export default function AdminLoginForm({ initialError }: AdminLoginFormProps) {
     }
 
     startTransition(() => {
-      router.replace('/admin/sessions')
+      router.replace('/admin')
       router.refresh()
     })
   }

@@ -292,8 +292,8 @@ export default function AdminTableDetailClient({
   return (
     <>
       <div className="heroHeader compact">
-        <Link className="backLink" href="/admin/sessions">
-          ← Back to sessions
+        <Link className="backLink" href="/admin">
+          ← Back to dashboard
         </Link>
         <p className="eyebrow">Admin Detail</p>
         <h1>{table?.label ?? `Table ${tableId}`}</h1>
@@ -310,7 +310,7 @@ export default function AdminTableDetailClient({
         <Link className="button" href={`/table/${tableId}`}>
           Open guest view
         </Link>
-        <Link className="button buttonSecondary" href="/admin/sessions">
+        <Link className="button buttonSecondary" href="/admin">
           Back to all tables
         </Link>
         <AdminLogoutButton />

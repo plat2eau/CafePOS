@@ -723,6 +723,313 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   background: var(--card-bg);
 }
 
+.adminShell {
+  position: relative;
+}
+
+.adminTopBar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.16);
+}
+
+.adminTopBarIntro h1 {
+  max-width: none;
+}
+
+.adminAccountRow,
+.adminBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.adminTablesColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.adminTableGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 220px));
+  gap: 16px;
+}
+
+.adminTableCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  padding: 14px;
+  background:
+    radial-gradient(circle at top right, rgb(var(--accent-rgb) / 0.14), transparent 30%),
+    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.08), transparent 36%),
+    var(--card-bg-strong);
+}
+
+.adminTableCardLink {
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.adminTableCardLink:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 38px rgb(var(--shadow-rgb) / 0.14);
+  border-color: rgb(var(--accent-rgb) / 0.34);
+}
+
+.adminTableCardLink:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.adminTableCard::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 18px 0 0 18px;
+  background: rgb(var(--accent-rgb) / 0.14);
+}
+
+.adminTableCard.attention-payment::before {
+  background: #c26a2b;
+}
+
+.adminTableCard.attention-assistance::before {
+  background: #a34b3d;
+}
+
+.adminTableCard.attention-orders::before {
+  background: #7b4b25;
+}
+
+.adminTableMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.adminTableCardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.adminTableCardHeader .eyebrow {
+  margin-bottom: 0;
+}
+
+.adminTableCardHeader h2 {
+  font-size: 1.1rem;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.adminTableGuest {
+  color: var(--text) !important;
+  font-size: 0.96rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.adminTableSubtle {
+  font-size: 0.82rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.adminClampOneLine,
+.adminClampTwoLines {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.adminClampOneLine {
+  -webkit-line-clamp: 1;
+}
+
+.adminClampTwoLines {
+  -webkit-line-clamp: 2;
+}
+
+.adminTableCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid rgb(var(--accent-rgb) / 0.14);
+  color: var(--accent);
+}
+
+.adminTableOpenLabel {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.adminTableOpenArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 0.92rem;
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.adminTableCardLink:hover .adminTableOpenArrow {
+  transform: translateX(2px);
+}
+
+.adminEmptyState {
+  min-height: 220px;
+  justify-content: center;
+}
+
+.adminGridHeader {
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 2px;
+}
+
+.adminGridHeaderTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.adminGridHeaderTitle .eyebrow,
+.adminGridHeaderTitle h2 {
+  margin: 0;
+}
+
+.adminGridMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.adminTableCardTopRight {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 20px);
+  padding: 5px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.14);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.7);
+  box-shadow: 0 10px 24px rgb(var(--shadow-rgb) / 0.12);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+html[data-color-scheme='dark'] .adminTableCardTopRight {
+  background: rgb(18 27 40 / 0.72);
+}
+
+.adminCounterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 2px 4px 2px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.adminCounterIcon {
+  color: var(--accent);
+  line-height: 1;
+}
+
+.adminCounterCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.adminMobileFooter {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 35;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: min(760px, calc(100vw - 24px));
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--panel-strong);
+  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.adminMobileNavItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 8px;
+  border-radius: 16px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.adminMobileNavItem.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.adminMobileNavIcon {
+  font-size: 1.05rem;
+}
+
 .adminNotifierStack {
   position: fixed;
   right: 16px;
@@ -1227,6 +1534,10 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   .menuNavigator {
     right: 20px;
   }
+
+  .adminMobileFooter {
+    width: min(760px, calc(100vw - 40px));
+  }
 }
 
 
@@ -1244,5 +1555,24 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
   .menuNavigator {
     bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .adminTopBar {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .adminGridHeader {
+    align-items: center;
+    padding-bottom: 6px;
+  }
+
+  .adminGridMeta {
+    justify-content: flex-end;
+  }
+
+  .adminMobileFooter {
+    display: none;
   }
 }
