@@ -259,7 +259,7 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
     },
     {
       type: 0,
-      content: 'Scan this QR code to pay your bill.',
+      content: 'Scan this QR code to pay.',
       bold: 0,
       align: 1,
       format: 0
