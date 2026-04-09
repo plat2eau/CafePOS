@@ -9,9 +9,18 @@ type ReceiptPrintActionsProps = {
 export default function ReceiptPrintActions({ responsePath }: ReceiptPrintActionsProps) {
   const [launchMessage, setLaunchMessage] = useState<string | null>(null)
 
-  function handleBluetoothPrintLaunch() {
+  async function handleBluetoothPrintLaunch() {
     setLaunchMessage('If nothing opens, try this page in Android Chrome instead of the installed app.')
     const responseUrl = new URL(responsePath, window.location.origin)
+
+    try {
+      const response = await fetch(responseUrl.toString())
+      const bluetoothPrintJson = await response.json()
+      console.log('Bluetooth print JSON', bluetoothPrintJson)
+    } catch (error) {
+      console.error('Could not load Bluetooth print JSON before launch.', error)
+    }
+
     window.location.href = `my.bluetoothprint.scheme://${responseUrl.toString()}`
   }
 

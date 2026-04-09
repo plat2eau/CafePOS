@@ -50,6 +50,18 @@ export function formatReceiptTimestamp(value: string) {
   }).format(new Date(value))
 }
 
+export function buildReceiptQrValue(payload: ReceiptPayload) {
+  const params = new URLSearchParams({
+    pa: '9816822303@ptsbi',
+    pn: cafeReceiptHeader.name,
+    am: (payload.grandTotalCents / 100).toFixed(2),
+    cu: 'INR',
+    tn: "Cheekoo's Bill"
+  })
+
+  return `upi://pay?${params.toString()}`
+}
+
 export function buildReceiptPayload({
   activeSession,
   recentOrders,
@@ -95,6 +107,7 @@ export function buildReceiptPayload({
 
 export function buildBluetoothPrintJson(payload: ReceiptPayload) {
   const separator = '--------------------------------'
+  const qrValue = buildReceiptQrValue(payload)
   const lines: Array<Record<string, number | string>> = [
     {
       type: 0,
@@ -243,6 +256,19 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
       bold: 1,
       align: 2,
       format: 0
+    },
+    {
+      type: 0,
+      content: ' ',
+      bold: 0,
+      align: 0,
+      format: 0
+    },
+    {
+      type: 3,
+      value: qrValue,
+      size: 30,
+      align: 1
     }
   )
 

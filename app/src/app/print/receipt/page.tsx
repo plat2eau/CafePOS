@@ -1,13 +1,14 @@
 import Image from 'next/image'
+import QRCode from 'qrcode'
 import { notFound } from 'next/navigation'
 import ReceiptPrintActions from '@/components/ReceiptPrintActions'
 import {
+  buildReceiptQrValue,
   cafeReceiptHeader,
   formatReceiptTimestamp,
   toReceiptPrice
 } from '@/lib/receipt-print'
 import { verifyReceiptToken } from '@/lib/receipt-print-server'
-import receiptQrImage from '../../../../recipt qr.png'
 
 type ReceiptPageProps = {
   searchParams: Promise<{
@@ -29,6 +30,10 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
   }
 
   const responsePath = `/api/print/receipt?token=${encodeURIComponent(token)}`
+  const qrCodeDataUrl = await QRCode.toDataURL(buildReceiptQrValue(payload), {
+    margin: 1,
+    width: 180
+  })
 
   return (
     <main>
@@ -114,10 +119,12 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
 
           <div className="receiptQrBlock">
             <Image
-              src={receiptQrImage}
-              alt="Linktree QR code for Cheekoo's Cafe"
+              src={qrCodeDataUrl}
+              alt="Receipt QR code"
               className="receiptQrImage"
-              priority
+              width={180}
+              height={180}
+              unoptimized
             />
           </div>
         </article>
