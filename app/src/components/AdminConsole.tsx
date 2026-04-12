@@ -33,6 +33,7 @@ function toPrice(priceCents: number) {
 
 function formatTimestamp(value: string) {
   return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     hour: 'numeric',
     minute: '2-digit',
     day: 'numeric',

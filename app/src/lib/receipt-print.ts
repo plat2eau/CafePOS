@@ -49,6 +49,7 @@ export function toReceiptPrice(priceCents: number) {
 
 export function formatReceiptTimestamp(value: string) {
   return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     hour: 'numeric',
     minute: '2-digit',
     day: 'numeric',

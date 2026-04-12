@@ -17,6 +17,9 @@
   --bg-gradient-start: #faf3e8;
   --bg-gradient-end: #efe3d1;
   --shadow: 0 18px 48px rgb(var(--shadow-rgb) / 0.08);
+  --success-glow: rgb(84 133 94 / 0.14);
+  --success-surface-start: rgb(245 255 246 / 0.98);
+  --success-surface-end: rgb(255 255 255 / 0.92);
 }
 
 html[data-color-scheme='dark'] {
@@ -38,6 +41,9 @@ html[data-color-scheme='dark'] {
   --bg-gradient-start: #162131;
   --bg-gradient-end: #0d141f;
   --shadow: 0 18px 48px rgb(var(--shadow-rgb) / 0.35);
+  --success-glow: rgb(74 222 128 / 0.18);
+  --success-surface-start: rgb(18 58 42 / 0.9);
+  --success-surface-end: rgb(20 31 44 / 0.94);
 }
 
 * {
@@ -306,8 +312,8 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
 .successHeroCard {
   background:
-    radial-gradient(circle at top right, rgba(84, 133, 94, 0.14), transparent 34%),
-    linear-gradient(135deg, rgba(245, 255, 246, 0.98), rgba(255, 255, 255, 0.92));
+    radial-gradient(circle at top right, var(--success-glow), transparent 34%),
+    linear-gradient(135deg, var(--success-surface-start), var(--success-surface-end));
 }
 
 .stack {
