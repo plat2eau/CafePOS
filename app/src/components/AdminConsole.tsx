@@ -681,21 +681,8 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                   total={toPrice(order.total_cents)}
                   actions={
                     <ActionGroup>
-                      {order.table_id ? (
-                        <Button
-                          variant="secondary"
-                          size="form"
-                          className="md:w-auto"
-                          type="button"
-                          onClick={() =>
-                            setExpandedTableId((current) =>
-                              current === order.table_id ? null : order.table_id
-                            )
-                          }
-                        >
-                          {expandedTableId === order.table_id ? 'Hide table' : 'Manage in dashboard'}
-                        </Button>
-                      ) : (
+                      {!order.table_id ? (
+                        <>
                         <LoadingButton
                           variant="secondary"
                           size="form"
@@ -707,8 +694,9 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                           onClick={() => void handleOpenOutOrderReceipt(order.id)}
                         >
                           Print receipt
-                        </LoadingButton>
-                      )}
+                          </LoadingButton>
+                        </>
+                      ) : ""}
                     </ActionGroup>
                   }
                 />
@@ -740,6 +728,7 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                   <SectionCard
                     key={session.id}
                     tone="support"
+                    style={{display: "flex", gap: "16px", flexDirection: "column"}}
                     className="bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.08),transparent_32%),var(--card-bg-strong)]"
                   >
                     <SummaryRow>
@@ -755,20 +744,32 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                       <span className="metaPill">Last active {formatTimestamp(session.last_active_at)}</span>
                     </div>
                     <ActionGroup>
+                      <LoadingButton
+                            size="form"
+                            className="md:w-auto"
+                            type="button"
+                            loading={isClearingTable && clearTargetTableId === session.table_id}
+                            loadingLabel="Clearing table..."
+                            disabled={isClearingTable}
+                            onClick={() => {
+                              setDiscountPercentage('')
+                              setClearTargetTableId(session.table_id)
+                            }}
+                          >
+                            Clear table
+                          </LoadingButton>
                       <Button
                         size="form"
                         className="md:w-auto"
                         type="button"
+                        variant="secondary"
                         onClick={() =>
                           setExpandedTableId((current) =>
                             current === session.table_id ? null : session.table_id
                           )
                         }
                       >
-                        {isExpanded ? 'Hide details' : 'Manage table'}
-                      </Button>
-                      <Button asChild variant="secondary" size="form" className="md:w-auto">
-                        <Link href={`/table/${session.table_id}`}>Open guest view</Link>
+                        {isExpanded ? 'Hide details' : 'View Details'}
                       </Button>
                     </ActionGroup>
 
