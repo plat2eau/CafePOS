@@ -3,6 +3,9 @@
 import { useActionState } from 'react'
 import type { GuestSessionActionState } from '@/app/table/[tableId]/actions'
 import FormActionButton from '@/components/FormActionButton'
+import { FlashMessage } from '@/components/ui/flash-message'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 type GuestSessionFormProps = {
   action: (
@@ -25,12 +28,15 @@ export default function GuestSessionForm({
   requirePin = false
 }: GuestSessionFormProps) {
   const [state, formAction] = useActionState(action, guestSessionInitialState)
+  const helperText = requirePin
+    ? 'Enter your own details, then use the active session PIN to join this table from this device.'
+    : 'These details are only used for your current table order.'
 
   return (
-    <form action={formAction} className="sessionForm">
-      <div className="formField">
-        <label htmlFor="guest-name">Guest name</label>
-        <input
+    <form action={formAction} className="mt-4 flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="guest-name">Guest name</Label>
+        <Input
           id="guest-name"
           name="name"
           type="text"
@@ -40,9 +46,9 @@ export default function GuestSessionForm({
         />
       </div>
 
-      <div className="formField">
-        <label htmlFor="guest-phone">Phone number</label>
-        <input
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="guest-phone">Phone number</Label>
+        <Input
           id="guest-phone"
           name="phone"
           type="tel"
@@ -54,9 +60,9 @@ export default function GuestSessionForm({
       </div>
 
       {requirePin ? (
-        <div className="formField">
-          <label htmlFor="session-pin">Session PIN</label>
-          <input
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="session-pin">Session PIN</Label>
+          <Input
             id="session-pin"
             name="pin"
             type="password"
@@ -70,19 +76,15 @@ export default function GuestSessionForm({
         </div>
       ) : null}
 
-      <div className="formFooter">
+      <div className="formActions">
         <FormActionButton label="Continue to menu" loadingLabel="Opening your table..." />
-        <p className="finePrint">
-          {requirePin
-            ? 'Enter your own details, then use the active session PIN to join this table from this device.'
-            : 'These details are only used for your current table order.'}
-        </p>
+        <p className="formSupportText">{helperText}</p>
       </div>
 
       {state.status !== 'idle' ? (
-        <p className={state.status === 'success' ? 'statusMessage success' : 'statusMessage error'}>
+        <FlashMessage tone={state.status === 'success' ? 'success' : 'error'}>
           {state.message}
-        </p>
+        </FlashMessage>
       ) : null}
     </form>
   )

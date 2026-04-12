@@ -1,4 +1,37 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@custom-variant dark (&:where([data-color-scheme='dark'], [data-color-scheme='dark'] *));
+
+@theme inline {
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted-surface);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--accent-surface);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
 :root {
+  color-scheme: light;
   --bg: #f5efe6;
   --panel: rgba(255, 251, 245, 0.92);
   --panel-strong: rgba(255, 253, 250, 0.96);
@@ -20,9 +53,28 @@
   --success-glow: rgb(84 133 94 / 0.14);
   --success-surface-start: rgb(245 255 246 / 0.98);
   --success-surface-end: rgb(255 255 255 / 0.92);
+  --radius: 18px;
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--card-bg);
+  --card-foreground: var(--text);
+  --popover: var(--panel-strong);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--button-text);
+  --secondary: var(--card-bg-strong);
+  --secondary-foreground: var(--text);
+  --muted-surface: var(--panel-strong);
+  --accent-surface: var(--accent-soft);
+  --accent-foreground: var(--accent);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: var(--button-text);
+  --input: var(--border);
+  --ring: var(--focus-ring);
 }
 
 html[data-color-scheme='dark'] {
+  color-scheme: dark;
   --bg: #121b28;
   --panel: rgb(21 30 42 / 0.9);
   --panel-strong: rgb(24 35 49 / 0.96);
@@ -58,7 +110,7 @@ body {
     radial-gradient(circle at top left, var(--bg-glow), transparent 30%),
     linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
   color: var(--text);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-sans);
 }
 
 body {
@@ -232,9 +284,10 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 }
 
 .responsiveSplit {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column-reverse;
   gap: 16px;
+  width: 100%;
 }
 
 .orderLayout {
@@ -247,73 +300,6 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: clamp(14px, 2vw, 20px);
-}
-
-.card {
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: clamp(18px, 2.8vw, 24px);
-  background: var(--card-bg);
-  min-width: 0;
-}
-
-.card p {
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.cardLink {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    border-color 160ms ease;
-}
-
-.cardLink:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.08);
-  border-color: rgb(var(--accent-rgb) / 0.35);
-}
-
-.supportCard {
-  background:
-    linear-gradient(135deg, rgb(var(--accent-rgb) / 0.12), transparent 60%),
-    var(--panel-strong);
-}
-
-.warningCard {
-  background:
-    radial-gradient(circle at top right, rgba(176, 76, 61, 0.12), transparent 34%),
-    rgba(255, 251, 248, 0.94);
-}
-
-.sessionGateCard {
-  max-width: 760px;
-  margin: 0 auto;
-  background:
-    radial-gradient(circle at top right, rgb(var(--accent-rgb) / 0.08), transparent 34%),
-    var(--card-bg-strong);
-}
-
-.guestBanner {
-  background:
-    radial-gradient(circle at top right, rgb(var(--accent-rgb) / 0.12), transparent 36%),
-    linear-gradient(135deg, var(--panel-strong), var(--card-bg-strong));
-}
-
-.menuIntroCard {
-  background:
-    radial-gradient(circle at top left, rgb(var(--accent-rgb) / 0.09), transparent 34%),
-    var(--card-bg-strong);
-}
-
-.successHeroCard {
-  background:
-    radial-gradient(circle at top right, var(--success-glow), transparent 34%),
-    linear-gradient(135deg, var(--success-surface-start), var(--success-surface-end));
 }
 
 .stack {
@@ -369,54 +355,6 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   gap: 12px;
 }
 
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 48px;
-  padding: 12px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--button-text);
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    opacity 160ms ease,
-    background 160ms ease,
-    color 160ms ease;
-}
-
-.button:hover {
-  transform: translateY(-1px);
-}
-
-.button:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-
-.buttonLoading {
-  pointer-events: none;
-}
-
-.buttonSpinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 999px;
-  animation: buttonSpin 0.8s linear infinite;
-}
-
-.buttonSecondary {
-  background: transparent;
-  color: var(--accent);
-}
-
 .sessionForm {
   display: flex;
   flex-direction: column;
@@ -463,6 +401,7 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   border-color: var(--accent);
 }
 
+.formActions,
 .formFooter {
   display: flex;
   flex-direction: column;
@@ -490,28 +429,12 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   margin: 0;
 }
 
+.formSupportText,
 .finePrint {
   margin: 0;
   color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.6;
-}
-
-.statusMessage {
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  font-weight: 600;
-}
-
-.statusMessage.success {
-  background: rgba(84, 133, 94, 0.14);
-  color: #2d6b38;
-}
-
-.statusMessage.error {
-  background: rgba(176, 76, 61, 0.14);
-  color: #8a2d24;
 }
 
 .summaryRow {
@@ -559,11 +482,6 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   min-width: 2ch;
   text-align: center;
   font-weight: 700;
-}
-
-.orderSummaryCard {
-  position: sticky;
-  top: 20px;
 }
 
 .menuSearchBarWrap {
@@ -632,215 +550,10 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   box-shadow: 0 0 0 4px var(--focus-ring);
 }
 
-.searchBarClear {
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font: inherit;
-  font-size: 0.92rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .searchBarSummary {
   margin: 0;
   color: var(--muted);
   font-size: 0.92rem;
-}
-
-.mobileBottomBar {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: min(720px, calc(100vw - 24px));
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--panel-strong);
-  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.12);
-  backdrop-filter: blur(12px);
-  z-index: 30;
-}
-
-.mobileBottomBar.expanded {
-  gap: 16px;
-}
-
-.orderDrawerPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.orderDrawerHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.drawerCloseButton {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--accent);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.mobileBottomBarSummary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.mobileBottomBarSummaryText {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex: 1;
-}
-
-.mobileBottomBarChevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card-bg);
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
-}
-
-.mobileBottomBarChevron svg {
-  width: 18px;
-  height: 18px;
-}
-
-.mobileBottomBarChevron.expanded {
-  transform: rotate(180deg);
-  border-color: rgb(var(--accent-rgb) / 0.36);
-  background: var(--accent-soft);
-}
-
-.menuNavigator {
-  position: fixed;
-  right: 12px;
-  bottom: calc(140px + env(safe-area-inset-bottom, 0px));
-  z-index: 35;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.menuNavigatorPanel {
-  width: min(240px, calc(100vw - 24px));
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.08), transparent 42%),
-    var(--panel-strong);
-  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.14);
-  backdrop-filter: blur(12px);
-}
-
-.menuNavigatorLabel {
-  margin: 0 0 10px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.menuNavigatorList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: min(45vh, 320px);
-  overflow-y: auto;
-}
-
-.menuNavigatorItem,
-.menuNavigatorToggle {
-  border: 1px solid var(--border);
-  background: var(--panel-strong);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease,
-    color 160ms ease;
-}
-
-.menuNavigatorItem {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 14px;
-  text-align: left;
-}
-
-.menuNavigatorItem:hover,
-.menuNavigatorItem.active {
-  border-color: rgb(var(--accent-rgb) / 0.36);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.menuNavigatorToggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  padding: 0;
-  border-radius: 999px;
-  box-shadow: 0 14px 28px rgb(var(--shadow-rgb) / 0.14);
-  backdrop-filter: blur(12px);
-}
-
-.menuNavigatorToggle:hover {
-  transform: translateY(-1px);
-  border-color: rgb(var(--accent-rgb) / 0.36);
-}
-
-.menuNavigatorToggleIcon {
-  width: 24px;
-  height: 24px;
-}
-
-.adminOrderCard,
-.adminSessionCard {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
 }
 
 .adminNotifierStack {
@@ -1398,13 +1111,6 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
     align-items: center;
   }
 
-  .mobileBottomBar {
-    width: min(720px, calc(100vw - 40px));
-  }
-
-  .menuNavigator {
-    right: 20px;
-  }
 }
 
 
@@ -1433,11 +1139,8 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   }
 
   .responsiveSplit {
-    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    flex-direction: row;
     align-items: start;
   }
 
-  .menuNavigator {
-    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-  }
 }

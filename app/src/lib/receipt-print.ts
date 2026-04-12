@@ -1,4 +1,4 @@
-import type { AdminOrder, AdminTableDetailData } from '@/lib/admin-data'
+import type { AdminOrder, AdminSession } from '@/lib/admin-data'
 
 export const cafeReceiptHeader = {
   name: "Cheekoo's Cafe",
@@ -30,7 +30,9 @@ export type ReceiptPayload = {
   grandTotalCents: number
 }
 
-type BuildReceiptPayloadOptions = Pick<AdminTableDetailData, 'activeSession' | 'recentOrders'> & {
+type BuildReceiptPayloadOptions = {
+  activeSession: Pick<AdminSession, 'guest_name'> | null
+  recentOrders: AdminOrder[]
   discountPercentage?: number | null
 }
 

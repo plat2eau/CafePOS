@@ -3,8 +3,16 @@
 import { useActionState, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PlaceOrderActionState } from '@/app/table/[tableId]/actions'
+import AppOverlaySheet from '@/components/AppOverlaySheet'
 import FormActionButton from '@/components/FormActionButton'
 import SearchBar from '@/components/SearchBar'
+import { ActionGroup } from '@/components/ui/action-group'
+import { Button } from '@/components/ui/button'
+import { FlashMessage } from '@/components/ui/flash-message'
+import { QuantityStepper } from '@/components/ui/quantity-stepper'
+import { SectionCard } from '@/components/ui/section-card'
+import { SummaryRow } from '@/components/ui/summary-row'
+import { Textarea } from '@/components/ui/textarea'
 
 type MenuCategory = {
   id: string
@@ -60,6 +68,7 @@ export default function GuestOrderingExperience({
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
+  const orderFormId = `guest-order-form-${tableId}`
 
   const filteredItems = useMemo(() => {
     if (!normalizedSearchQuery) {
@@ -131,6 +140,7 @@ export default function GuestOrderingExperience({
       setNote('')
       setShowSuccessCard(true)
       setIsOrderSheetOpen(false)
+      setIsNavigatorOpen(false)
       const timeout = window.setTimeout(() => {
         router.push(`/table/${tableId}/orders?placed=1`)
       }, 900)
@@ -200,6 +210,12 @@ export default function GuestOrderingExperience({
     }
   }, [isOrderSheetOpen])
 
+  useEffect(() => {
+    if (isNavigatorOpen) {
+      setIsOrderSheetOpen(false)
+    }
+  }, [isNavigatorOpen])
+
   function adjustQuantity(itemId: string, delta: number) {
     setQuantities((current) => {
       const nextQuantity = Math.max(0, (current[itemId] ?? 0) + delta)
@@ -224,16 +240,12 @@ export default function GuestOrderingExperience({
     setIsNavigatorOpen(false)
   }
 
-  function toggleOrderSheet() {
-    setIsOrderSheetOpen((current) => !current)
-  }
-
   const searchSummary = normalizedSearchQuery
     ? `${filteredItems.length} matching item${filteredItems.length === 1 ? '' : 's'}`
     : `${items.length} item${items.length === 1 ? '' : 's'} on the menu`
 
   return (
-    <form action={formAction} className="sectionStack">
+    <form id={orderFormId} action={formAction} className="sectionStack">
       <input
         type="hidden"
         name="items"
@@ -244,20 +256,25 @@ export default function GuestOrderingExperience({
           }))
         )}
       />
+      <input type="hidden" name="note" value={note} />
 
       <div className="orderLayout">
         <div className="sectionStack">
           {showSuccessCard ? (
-            <article className="card successHeroCard">
+            <SectionCard tone="success">
               <p className="eyebrow">Order placed</p>
               <h2>Your order is in</h2>
               <p>Thanks, {guestName}. The cafe team has received your order and will start preparing it.</p>
               <div className="buttonRow">
-                <button className="button" type="button" onClick={() => setShowSuccessCard(false)}>
+                <Button
+                  className="min-h-12 w-full rounded-full px-4 py-3 md:w-auto"
+                  type="button"
+                  onClick={() => setShowSuccessCard(false)}
+                >
                   Add more items
-                </button>
+                </Button>
               </div>
-            </article>
+            </SectionCard>
           ) : null}
 
           <div className="menuSearchBarWrap">
@@ -272,15 +289,15 @@ export default function GuestOrderingExperience({
 
           <div className="grid">
             {categorySections.length === 0 ? (
-              <article className="card supportCard">
+              <SectionCard tone="support">
                 <p className="eyebrow">No matches</p>
                 <h2>No menu items found</h2>
                 <p>Try a different search term to find something from the menu.</p>
-              </article>
+              </SectionCard>
             ) : (
               categorySections.map((category) => (
-                <article
-                  className="card menuCategoryCard"
+                <SectionCard
+                  className="menuCategoryCard"
                   key={category.id}
                   id={category.anchorId}
                   data-category-id={category.id}
@@ -304,192 +321,144 @@ export default function GuestOrderingExperience({
                               <strong>{toPrice(item.price_cents)}</strong>
                             </div>
 
-                            <div className="quantityControls">
-                              <button
-                                className="quantityButton"
-                                type="button"
-                                disabled={previewMode}
-                                onClick={() => adjustQuantity(item.id, -1)}
-                                aria-label={`Remove one ${item.name}`}
-                              >
-                                -
-                              </button>
-                              <span className="quantityValue">{quantity}</span>
-                              <button
-                                className="quantityButton"
-                                type="button"
-                                disabled={previewMode}
-                                onClick={() => adjustQuantity(item.id, 1)}
-                                aria-label={`Add one ${item.name}`}
-                              >
-                                +
-                              </button>
-                            </div>
+                            <QuantityStepper
+                              value={quantity}
+                              disabled={previewMode}
+                              decrementLabel={`Remove one ${item.name}`}
+                              incrementLabel={`Add one ${item.name}`}
+                              onDecrement={() => adjustQuantity(item.id, -1)}
+                              onIncrement={() => adjustQuantity(item.id, 1)}
+                            />
                           </div>
                         )
                       })}
                     </div>
                   )}
-                </article>
+                </SectionCard>
               ))
             )}
           </div>
         </div>
 
-        <div className={`mobileBottomBar${isOrderSheetOpen ? ' expanded' : ''}`}>
-          <button
-            className="mobileBottomBarSummary"
-            type="button"
-            aria-expanded={isOrderSheetOpen}
-            aria-controls="order-drawer-panel"
-            onClick={toggleOrderSheet}
-          >
-            <span className="mobileBottomBarSummaryText">
-              <strong>{selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}</strong>
-              <span>{toPrice(totalCents)}</span>
-            </span>
-            <span className={`mobileBottomBarChevron${isOrderSheetOpen ? ' expanded' : ''}`}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </span>
-          </button>
-
-          {isOrderSheetOpen ? (
-            <div className="orderDrawerPanel" id="order-drawer-panel">
-              <div className="orderDrawerHeader">
-                <div>
-                  <p className="eyebrow">Your cart</p>
-                  <h2>Review your order</h2>
-                </div>
-                <button
-                  className="drawerCloseButton"
-                  type="button"
-                  onClick={() => setIsOrderSheetOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="stack">
-                {selectedItems.length === 0 ? (
-                  <p>No items selected yet.</p>
-                ) : (
-                  selectedItems.map((item) => (
-                    <div className="summaryRow" key={item.itemId}>
-                      <span>
-                        {item.name} x {item.quantity}
-                      </span>
-                      <strong>{toPrice(item.quantity * item.priceCents)}</strong>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="summaryRow total">
-                <span>Total</span>
-                <strong>{toPrice(totalCents)}</strong>
-              </div>
-
-              <div className="formField">
-                <label htmlFor="order-note">Note for the cafe</label>
-                <textarea
-                  id="order-note"
-                  name="note"
-                  rows={4}
-                  placeholder="Extra hot, less sugar, no onions..."
-                  disabled={previewMode}
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                />
-              </div>
-
-              <div className="formFooter">
-                <FormActionButton
-                  label={previewMode ? 'Preview mode' : 'Place order'}
-                  loadingLabel="Placing order..."
-                  disabled={previewMode || selectedItems.length === 0}
-                />
-                <p className="finePrint">
-                  {previewMode
-                    ? 'Admin preview: ordering is disabled in guest view preview mode.'
-                    : 'Your order will go straight to the cafe team.'}
-                </p>
-              </div>
-
-              {state.status === 'error' ? (
-                <p className="statusMessage error">{state.message}</p>
-              ) : null}
+        <div className="fixed inset-x-3 bottom-[max(12px,calc(env(safe-area-inset-bottom)+12px))] z-30 mx-auto flex w-[min(720px,calc(100vw-24px))] flex-col gap-3 rounded-[22px] border border-border bg-[var(--panel-strong)] p-3 shadow-[0_16px_32px_rgb(var(--shadow-rgb)/0.12)] backdrop-blur-xl sm:inset-x-5 sm:w-[min(720px,calc(100vw-40px))]">
+          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-border bg-[var(--card-bg)] px-4 py-3">
+            <div className="min-w-0">
+              <p className="m-0 text-sm font-semibold text-foreground">
+                {selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}
+              </p>
+              <p className="m-0 text-sm text-[var(--muted)]">
+                {selectedItems.length === 0
+                  ? 'Add items to start an order.'
+                  : 'Review your cart before placing the order.'}
+              </p>
             </div>
-          ) : (
-            <button
-              className="button"
+            <strong className="shrink-0 text-base">{toPrice(totalCents)}</strong>
+          </div>
+
+          <ActionGroup className="sm:justify-end">
+            {categorySections.length > 1 ? (
+              <Button
+                className="sm:w-auto"
+                variant="secondary"
+                size="form"
+                type="button"
+                onClick={() => setIsNavigatorOpen(true)}
+              >
+                Menu sections
+              </Button>
+            ) : null}
+            <Button
+              className="sm:w-auto"
+              size="form"
               type="button"
               disabled={previewMode || selectedItems.length === 0}
               onClick={() => setIsOrderSheetOpen(true)}
             >
-              {previewMode ? 'Preview mode' : 'Place order'}
-            </button>
-          )}
+              {previewMode ? 'Preview mode' : 'Review order'}
+            </Button>
+          </ActionGroup>
         </div>
 
-        {categorySections.length > 1 && !isOrderSheetOpen ? (
-          <div className={`menuNavigator${isNavigatorOpen ? ' open' : ''}`}>
-            {isNavigatorOpen ? (
-              <div className="menuNavigatorPanel" aria-label="Menu sections">
-                <p className="menuNavigatorLabel">Jump to section</p>
-                <div className="menuNavigatorList">
-                  {categorySections.map((category) => (
-                    <button
-                      key={category.id}
-                      className={`menuNavigatorItem${
-                        activeCategoryId === category.id ? ' active' : ''
-                      }`}
-                      type="button"
-                      onClick={() => jumpToCategory(category.id, category.anchorId)}
-                    >
-                      {category.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <button
-              className="menuNavigatorToggle"
-              type="button"
-              aria-expanded={isNavigatorOpen}
-              aria-label={
-                isNavigatorOpen
-                  ? 'Close menu section navigator'
-                  : 'Open menu section navigator'
-              }
-              onClick={() => setIsNavigatorOpen((current) => !current)}
-            >
-              <svg
-                className="menuNavigatorToggleIcon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M4 7h16" />
-                <path d="M4 12h16" />
-                <path d="M4 17h10" />
-              </svg>
-            </button>
+        <AppOverlaySheet
+          open={isOrderSheetOpen}
+          onOpenChange={setIsOrderSheetOpen}
+          eyebrow="Your cart"
+          title="Review your order"
+          description="Confirm the selected items, add a note for the cafe, and place the order when you are ready."
+        >
+          <div className="stack mt-0">
+            {selectedItems.length === 0 ? (
+              <p>No items selected yet.</p>
+            ) : (
+              selectedItems.map((item) => (
+                <SummaryRow key={item.itemId}>
+                  <span>
+                    {item.name} x {item.quantity}
+                  </span>
+                  <strong>{toPrice(item.quantity * item.priceCents)}</strong>
+                </SummaryRow>
+              ))
+            )}
           </div>
+
+          <SummaryRow variant="total">
+            <span>Total</span>
+            <strong>{toPrice(totalCents)}</strong>
+          </SummaryRow>
+
+          <div className="formField">
+            <label htmlFor="order-note">Note for the cafe</label>
+            <Textarea
+              id="order-note"
+              rows={4}
+              placeholder="Extra hot, less sugar, no onions..."
+              disabled={previewMode}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <FormActionButton
+              form={orderFormId}
+              label={previewMode ? 'Preview mode' : 'Place order'}
+              loadingLabel="Placing order..."
+              disabled={previewMode || selectedItems.length === 0}
+            />
+            <p className="finePrint">
+              {previewMode
+                ? 'Admin preview: ordering is disabled in guest view preview mode.'
+                : 'Your order will go straight to the cafe team.'}
+            </p>
+          </div>
+
+          {state.status === 'error' ? (
+            <FlashMessage tone="error">{state.message}</FlashMessage>
+          ) : null}
+        </AppOverlaySheet>
+
+        {categorySections.length > 1 ? (
+          <AppOverlaySheet
+            open={isNavigatorOpen}
+            onOpenChange={setIsNavigatorOpen}
+            eyebrow="Browse menu"
+            title="Jump to a section"
+            description="Move straight to the category you want without scrolling through the full menu."
+          >
+            <div className="flex flex-col gap-2" aria-label="Menu sections">
+              {categorySections.map((category) => (
+                <Button
+                  key={category.id}
+                  className="h-auto justify-start rounded-2xl px-4 py-3 text-left"
+                  variant={activeCategoryId === category.id ? 'default' : 'secondary'}
+                  type="button"
+                  onClick={() => jumpToCategory(category.id, category.anchorId)}
+                >
+                  {category.name}
+                </Button>
+              ))}
+            </div>
+          </AppOverlaySheet>
         ) : null}
       </div>
     </form>

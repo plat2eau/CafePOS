@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button, ButtonSpinner } from '@/components/ui/button'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 export default function AdminLogoutButton() {
@@ -23,21 +24,24 @@ export default function AdminLogoutButton() {
   }
 
   return (
-    <button
-      className={`button buttonSecondary${isPending ? ' buttonLoading' : ''}`}
+    <Button
+      variant="secondary"
+      size="form"
+      className="md:w-auto"
       type="button"
       onClick={handleLogout}
       disabled={isPending}
       aria-busy={isPending}
+      data-loading={isPending ? 'true' : undefined}
     >
       {isPending ? (
         <>
-          <span className="buttonSpinner" aria-hidden="true" />
+          <ButtonSpinner />
           Signing out...
         </>
       ) : (
         'Sign out'
       )}
-    </button>
+    </Button>
   )
 }

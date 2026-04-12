@@ -1,5 +1,9 @@
 'use client'
 
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+
 type SearchBarProps = {
   value: string
   onChange: (nextValue: string) => void
@@ -20,15 +24,15 @@ export default function SearchBar({
   const inputId = `search-bar-${label.toLowerCase().replace(/\s+/g, '-')}`
 
   return (
-    <div className={`searchBarShell${className ? ` ${className}` : ''}`}>
+    <div className={cn('searchBarShell', className)}>
       <div className="searchBarField">
-        <label className="searchBarLabel" htmlFor={inputId}>
+        <Label className="searchBarLabel" htmlFor={inputId}>
           {label}
-        </label>
+        </Label>
         <div className="searchBarInputWrap">
-          <input
+          <Input
             id={inputId}
-            className="searchBarInput"
+            className="searchBarInput border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
             type="search"
             inputMode="search"
             value={value}

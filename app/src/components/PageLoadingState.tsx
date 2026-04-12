@@ -1,3 +1,5 @@
+import { SectionCard } from '@/components/ui/section-card'
+
 type PageLoadingStateProps = {
   eyebrow: string
   title: string
@@ -23,11 +25,11 @@ export default function PageLoadingState({
 
         <div className="compactGrid">
           {Array.from({ length: cardCount }).map((_, index) => (
-            <article className="card loadingCard" key={index}>
+            <SectionCard as="article" className="loadingCard" key={index}>
               <div className="loadingLine loadingLineShort" />
               <div className="loadingLine loadingLineMedium" />
               <div className="loadingLine loadingLineBody" />
-            </article>
+            </SectionCard>
           ))}
         </div>
 

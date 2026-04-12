@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { ActionGroup } from '@/components/ui/action-group'
+import { Button } from '@/components/ui/button'
 
 type ReceiptPrintActionsProps = {
   responsePath: string
@@ -26,17 +28,19 @@ export default function ReceiptPrintActions({ responsePath }: ReceiptPrintAction
 
   return (
     <div className="sectionStack compact">
-      <div className="buttonRow">
-        <button className="button" type="button" onClick={handleBluetoothPrintLaunch}>
+      <ActionGroup>
+        <Button size="form" className="md:w-auto" type="button" onClick={handleBluetoothPrintLaunch}>
           Print with Bluetooth Print app
-        </button>
-        <a className="button buttonSecondary" href={responsePath} target="_blank" rel="noreferrer">
-          Open debug JSON
-        </a>
-      </div>
-      <button className="button buttonSecondary" type="button" onClick={() => window.print()}>
+        </Button>
+        <Button asChild variant="secondary" size="form" className="md:w-auto">
+          <a href={responsePath} target="_blank" rel="noreferrer">
+            Open debug JSON
+          </a>
+        </Button>
+      </ActionGroup>
+      <Button variant="secondary" size="form" className="md:w-auto" type="button" onClick={() => window.print()}>
         Browser print
-      </button>
+      </Button>
       {launchMessage ? <p className="finePrint">{launchMessage}</p> : null}
       <p className="finePrint">
         Android only. If the Bluetooth Print app does not open, try this receipt page in Chrome,

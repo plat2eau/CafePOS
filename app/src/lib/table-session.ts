@@ -6,6 +6,20 @@ export function getTableOrderIdentityCookieName(tableId: string) {
   return `cafepos-table-order-identity-${tableId}`
 }
 
+export function getTableSessionStorageKey(tableId: string) {
+  return `cafepos-table-session-storage-${tableId}`
+}
+
+export function getTableSessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 8
+  }
+}
+
 export type TableOrderIdentity = {
   name: string
   phone: string

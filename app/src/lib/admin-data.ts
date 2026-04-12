@@ -60,25 +60,6 @@ export type AdminOverviewData = {
   serviceRequests: AdminServiceRequest[]
 }
 
-export type AdminTableDetailData = {
-  table: {
-    id: string
-    label: string
-    is_active: boolean
-  } | null
-  activeSession: {
-    id: string
-    guest_name: string
-    guest_phone: string | null
-    started_at: string
-    last_active_at: string
-    session_pin: string
-    status: 'active' | 'closed'
-  } | null
-  recentOrders: AdminOrder[]
-  serviceRequests: AdminServiceRequest[]
-}
-
 async function fetchOrdersWithItems(options?: {
   tableId?: string
   sessionId?: string
@@ -164,7 +145,7 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   const supabase = createServerSupabaseClient()
   const { data: sessions, error: sessionsError } = await supabase
     .from('table_sessions')
-    .select('id, table_id, guest_name, guest_phone, last_active_at, session_pin')
+    .select('id, table_id, guest_name, guest_phone, started_at, last_active_at, session_pin')
     .eq('status', 'active')
     .order('last_active_at', { ascending: false })
 
@@ -200,54 +181,6 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     }))
   }
 }
-
-export async function getAdminTableDetailData(tableId: string): Promise<AdminTableDetailData> {
-  const supabase = createServerSupabaseClient()
-  const [{ data: table, error: tableError }, { data: activeSession, error: sessionError }] = await Promise.all([
-    supabase
-      .from('tables')
-      .select('id, label, is_active')
-      .eq('id', tableId)
-      .maybeSingle(),
-    supabase
-      .from('table_sessions')
-      .select('id, guest_name, guest_phone, started_at, last_active_at, session_pin, status')
-      .eq('table_id', tableId)
-      .eq('status', 'active')
-      .maybeSingle()
-  ])
-
-  if (tableError || sessionError) {
-    throw new Error('Could not load table details.')
-  }
-
-  const recentOrders = activeSession
-    ? await fetchOrdersWithItems({ sessionId: activeSession.id })
-    : []
-  const { data: serviceRequests, error: serviceRequestsError } = activeSession
-    ? await supabase
-        .from('service_requests')
-        .select('id, table_id, session_id, request_type, note, status, created_at')
-        .eq('session_id', activeSession.id)
-        .eq('status', 'open')
-        .order('created_at', { ascending: false })
-    : { data: [], error: null }
-
-  if (serviceRequestsError) {
-    throw new Error('Could not load service requests.')
-  }
-
-  return {
-    table,
-    activeSession,
-    recentOrders,
-    serviceRequests: (serviceRequests ?? []).map((request) => ({
-      ...request,
-      guest_name: activeSession?.guest_name ?? null
-    }))
-  }
-}
-
 export async function getAdminMenuItems(): Promise<AdminMenuItem[]> {
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase

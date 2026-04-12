@@ -6,9 +6,13 @@ import {
   createServiceRequestForTable,
   placeOrderForTable
 } from '@/app/table/[tableId]/actions'
+import { EmptyStateCard } from '@/components/AppCards'
+import GuestSessionAutoResume from '@/components/GuestSessionAutoResume'
 import GuestSessionForm from '@/components/GuestSessionForm'
 import GuestOrderingExperience from '@/components/GuestOrderingExperience'
 import GuestServiceRequestPanel from '@/components/GuestServiceRequestPanel'
+import { Button } from '@/components/ui/button'
+import { SectionCard } from '@/components/ui/section-card'
 import { getAdminAuthContext } from '@/lib/admin-auth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
@@ -93,6 +97,14 @@ export default async function TablePage({ params }: TablePageProps) {
   return (
     <main>
       <section className="hero heroShell">
+        {!isAdminPreview ? (
+          <GuestSessionAutoResume
+            tableId={tableId}
+            activeSessionId={activeSession?.id ?? null}
+            canAccessOrdering={canAccessOrdering}
+          />
+        ) : null}
+
         <div className="heroHeader compact">
           <div className="customerBrandBlink" aria-hidden="true">
             <div className="customerBrandBlinkFrame">
@@ -133,14 +145,16 @@ export default async function TablePage({ params }: TablePageProps) {
 
         {canAccessOrdering ? (
           <div className="buttonRow">
-            <Link className="button" href={`/table/${tableId}/orders`}>
-              View order history
-            </Link>
+            <Button asChild size="form" className="md:w-auto">
+              <Link href={`/table/${tableId}/orders`}>View order history</Link>
+            </Button>
           </div>
         ) : null}
 
         {!hasError && table && table.is_active && !canAccessOrdering && (
-          <article className="card sessionGateCard">
+          <SectionCard
+            className="mx-auto max-w-[760px] bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.08),transparent_34%),var(--card-bg-strong)]"
+          >
             <p className="eyebrow">Welcome</p>
             <h2>Start your table order</h2>
             <p className="lead">
@@ -150,15 +164,17 @@ export default async function TablePage({ params }: TablePageProps) {
             </p>
             {activeSession ? (
               <div className="compactGrid">
-                <article className="card supportCard">
-                  <p className="eyebrow">Already active</p>
-                  <h2>{activeSession.guest_name}</h2>
-                  <p>
-                    {isCurrentGuestSession
+                <EmptyStateCard
+                  eyebrow="Already active"
+                  title={activeSession.guest_name}
+                  description={
+                    isCurrentGuestSession
                       ? 'Continue with this table by confirming your details below.'
-                      : 'Use your own name and phone, then enter the session PIN from staff or the person who started this table.'}
-                  </p>
-                </article>
+                      : 'Use your own name and phone, then enter the session PIN from staff or the person who started this table.'
+                  }
+                  tone="support"
+                  density="default"
+                />
               </div>
             ) : null}
             <GuestSessionForm
@@ -167,12 +183,15 @@ export default async function TablePage({ params }: TablePageProps) {
               initialPhone={isCurrentGuestSession ? (activeSession?.guest_phone ?? '') : ''}
               requirePin={Boolean(activeSession && !isCurrentGuestSession)}
             />
-          </article>
+          </SectionCard>
         )}
 
         {!hasError && table && table.is_active && canAccessOrdering && (activeSession || isAdminPreview) && (
           <div className="sectionStack">
-            <article className="card supportCard guestBanner">
+            <SectionCard
+              tone="support"
+              className="bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.12),transparent_36%),linear-gradient(135deg,var(--panel-strong),var(--card-bg-strong))]"
+            >
               <p className="eyebrow">{isAdminPreview ? 'Admin preview' : 'Ready to order'}</p>
               <h2>
                 {isAdminPreview
@@ -198,7 +217,7 @@ export default async function TablePage({ params }: TablePageProps) {
                   </p>
                 </>
               ) : null}
-            </article>
+            </SectionCard>
             <GuestServiceRequestPanel action={serviceRequestAction} previewMode={isAdminPreview} />
             <GuestOrderingExperience
               tableId={tableId}

@@ -2,6 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button, ButtonSpinner } from '@/components/ui/button'
+import { FlashMessage } from '@/components/ui/flash-message'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 type AdminLoginFormProps = {
@@ -23,6 +27,7 @@ export default function AdminLoginForm({ initialError }: AdminLoginFormProps) {
   const [message, setMessage] = useState(getErrorMessage(initialError))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const isBusy = isSubmitting || isPending
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -67,10 +72,10 @@ export default function AdminLoginForm({ initialError }: AdminLoginFormProps) {
   }
 
   return (
-    <form className="sessionForm" onSubmit={handleSubmit}>
-      <div className="formField">
-        <label htmlFor="admin-email">Email</label>
-        <input
+    <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="admin-email">Email</Label>
+        <Input
           id="admin-email"
           name="email"
           type="email"
@@ -82,9 +87,9 @@ export default function AdminLoginForm({ initialError }: AdminLoginFormProps) {
         />
       </div>
 
-      <div className="formField">
-        <label htmlFor="admin-password">Password</label>
-        <input
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="admin-password">Password</Label>
+        <Input
           id="admin-password"
           name="password"
           type="password"
@@ -96,28 +101,29 @@ export default function AdminLoginForm({ initialError }: AdminLoginFormProps) {
         />
       </div>
 
-      <div className="formFooter">
-        <button
-          className={`button${isSubmitting || isPending ? ' buttonLoading' : ''}`}
+      <div className="formActions">
+        <Button
           type="submit"
-          disabled={isSubmitting || isPending}
-          aria-busy={isSubmitting || isPending}
+          size="form"
+          disabled={isBusy}
+          aria-busy={isBusy}
+          data-loading={isBusy ? 'true' : undefined}
         >
-          {isSubmitting || isPending ? (
+          {isBusy ? (
             <>
-              <span className="buttonSpinner" aria-hidden="true" />
+              <ButtonSpinner />
               Signing in...
             </>
           ) : (
             'Sign in to admin'
           )}
-        </button>
-        <p className="finePrint">
+        </Button>
+        <p className="formSupportText">
           Use a Supabase Auth user that also has a matching row in `staff_profiles`.
         </p>
       </div>
 
-      {message ? <p className="statusMessage error">{message}</p> : null}
+      {message ? <FlashMessage tone="error">{message}</FlashMessage> : null}
     </form>
   )
 }

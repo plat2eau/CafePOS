@@ -27,7 +27,7 @@ export default async function AdminSessionsPage() {
           <p className="eyebrow">Admin Ops</p>
           <h1>Active sessions</h1>
           <p className="lead">
-            Track active tables, follow incoming orders, and jump into a table to manage its flow.
+            Track active tables, follow incoming orders, and manage each occupied table directly from this dashboard.
           </p>
           <div className="metaPillRow">
             <span className="metaPill">

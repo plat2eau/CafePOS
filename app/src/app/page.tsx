@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import SupabaseStatus from '@/components/SupabaseStatus'
 
 const links = [
@@ -43,22 +45,28 @@ export default function HomePage() {
         </div>
 
         <div className="buttonRow">
-          <Link className="button" href="/table/1">
-            Open guest flow
-          </Link>
-          <Link className="button buttonSecondary" href="/admin/login">
-            Open admin flow
-          </Link>
+          <Button asChild size="form" className="md:w-auto">
+            <Link href="/table/1">Open guest flow</Link>
+          </Button>
+          <Button asChild variant="secondary" size="form" className="md:w-auto">
+            <Link href="/admin/login">Open admin flow</Link>
+          </Button>
         </div>
 
         <div className="grid">
           <SupabaseStatus />
           {links.map((link) => (
-            <Link key={link.href} className="card cardLink" href={link.href}>
-              <p className="eyebrow">Route</p>
-              <h2>{link.title}</h2>
-              <p>{link.description}</p>
-            </Link>
+            <Card
+              asChild
+              key={link.href}
+              className="flex flex-col gap-3 rounded-[18px] border-border bg-card p-[clamp(18px,2.8vw,24px)] shadow-none transition-[transform,box-shadow,border-color] hover:-translate-y-[2px] hover:border-[rgb(var(--accent-rgb)/0.35)] hover:shadow-[0_16px_32px_rgb(var(--shadow-rgb)/0.08)] [&_p]:leading-6 [&_p]:text-[var(--muted)]"
+            >
+              <Link href={link.href}>
+                <p className="eyebrow">Route</p>
+                <h2>{link.title}</h2>
+                <p>{link.description}</p>
+              </Link>
+            </Card>
           ))}
         </div>
       </section>

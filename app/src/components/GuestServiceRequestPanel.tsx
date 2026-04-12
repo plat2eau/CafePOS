@@ -3,6 +3,10 @@
 import { useActionState, useState } from 'react'
 import type { ServiceRequestActionState } from '@/app/table/[tableId]/actions'
 import FormActionButton from '@/components/FormActionButton'
+import { Button } from '@/components/ui/button'
+import { FlashMessage } from '@/components/ui/flash-message'
+import { SectionCard } from '@/components/ui/section-card'
+import { Textarea } from '@/components/ui/textarea'
 
 type GuestServiceRequestPanelProps = {
   action: (
@@ -25,7 +29,7 @@ export default function GuestServiceRequestPanel({
   const [requestType, setRequestType] = useState<'payment' | 'assistance'>('payment')
 
   return (
-    <article className="card supportCard">
+    <SectionCard tone="support">
       <p className="eyebrow">Need help?</p>
       <h2>Call the server</h2>
       <p>Use this if you are ready to pay or need anything else from the cafe team.</p>
@@ -36,34 +40,36 @@ export default function GuestServiceRequestPanel({
 
       {!isOpen && !previewMode ? (
         <div className="buttonRow">
-          <button className="button" type="button" onClick={() => setIsOpen(true)}>
+          <Button className="min-h-12 w-full rounded-full px-4 py-3 md:w-auto" type="button" onClick={() => setIsOpen(true)}>
             Call server
-          </button>
+          </Button>
         </div>
       ) : !previewMode ? (
         <form action={formAction} className="sessionForm">
           <div className="requestTypeRow">
-            <button
-              className={`button${requestType === 'payment' ? '' : ' buttonSecondary'}`}
+            <Button
+              className="min-h-12 flex-1 rounded-full px-4 py-3"
+              variant={requestType === 'payment' ? 'default' : 'secondary'}
               type="button"
               onClick={() => setRequestType('payment')}
             >
               Payment
-            </button>
-            <button
-              className={`button${requestType === 'assistance' ? '' : ' buttonSecondary'}`}
+            </Button>
+            <Button
+              className="min-h-12 flex-1 rounded-full px-4 py-3"
+              variant={requestType === 'assistance' ? 'default' : 'secondary'}
               type="button"
               onClick={() => setRequestType('assistance')}
             >
               Need help
-            </button>
+            </Button>
           </div>
 
           <input type="hidden" name="requestType" value={requestType} />
 
           <div className="formField">
             <label htmlFor="service-request-note">Note for the staff</label>
-            <textarea
+            <Textarea
               id="service-request-note"
               name="note"
               rows={3}
@@ -80,18 +86,18 @@ export default function GuestServiceRequestPanel({
               label={requestType === 'payment' ? 'Request payment' : 'Request assistance'}
               loadingLabel="Calling the staff..."
             />
-            <button className="button buttonSecondary" type="button" onClick={() => setIsOpen(false)}>
+            <Button variant="secondary" size="form" type="button" onClick={() => setIsOpen(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
 
           {state.status !== 'idle' ? (
-            <p className={state.status === 'success' ? 'statusMessage success' : 'statusMessage error'}>
+            <FlashMessage tone={state.status === 'success' ? 'success' : 'error'}>
               {state.message}
-            </p>
+            </FlashMessage>
           ) : null}
         </form>
       ) : null}
-    </article>
+    </SectionCard>
   )
 }

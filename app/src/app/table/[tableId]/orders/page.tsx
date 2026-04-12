@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import { EmptyStateCard, OrderCard } from '@/components/AppCards'
 import GuestOrderHistoryPoller from '@/components/GuestOrderHistoryPoller'
+import { SectionCard } from '@/components/ui/section-card'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { getAdminAuthContext } from '@/lib/admin-auth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getTableSessionCookieName } from '@/lib/table-session'
@@ -75,59 +78,65 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
         </div>
 
         {placed === '1' ? (
-          <article className="card successHeroCard">
+          <SectionCard tone="success">
             <p className="eyebrow">Order placed</p>
             <h2>Your order has been sent</h2>
             <p>The cafe team has your order now. You can check the latest details below.</p>
-          </article>
+          </SectionCard>
         ) : null}
 
         <div className="compactGrid">
           {!accessibleSessionId ? (
-            <article className="card supportCard">
-              <p className="eyebrow">Session required</p>
-              <h2>No linked table session</h2>
-              <p>Start a table session before trying to view your order history.</p>
-            </article>
+            <EmptyStateCard
+              eyebrow="Session required"
+              title="No linked table session"
+              description="Start a table session before trying to view your order history."
+              tone="support"
+              density="default"
+            />
           ) : error ? (
-            <article className="card supportCard">
-              <p className="eyebrow">Error</p>
-              <h2>Could not load orders</h2>
-              <p>{error.message}</p>
-            </article>
+            <EmptyStateCard
+              eyebrow="Error"
+              title="Could not load orders"
+              description={error.message}
+              tone="support"
+              density="default"
+            />
           ) : orders && orders.length > 0 ? (
             orders.map((order) => (
-              <article className="card" key={order.id}>
-                <div className="summaryRow">
-                  <strong>Order {order.id.slice(0, 8)}</strong>
-                  <span>{order.status}</span>
-                </div>
-                <p>
-                  Placed by {formatOrderIdentity(order.ordered_by_name, order.ordered_by_phone)}
-                </p>
-                <div className="stack">
-                  {(order.order_items ?? []).map((item, index) => (
-                    <div className="summaryRow" key={`${order.id}-${index}`}>
-                      <span>
-                        {item.item_name} x {item.quantity}
-                      </span>
-                      <strong>{toPrice(item.line_total_cents)}</strong>
-                    </div>
-                  ))}
-                </div>
-                {order.note ? <p>Note: {order.note}</p> : null}
-                <div className="summaryRow total">
-                  <span>Total</span>
-                  <strong>{toPrice(order.total_cents)}</strong>
-                </div>
-              </article>
+              <OrderCard
+                key={order.id}
+                title={`Order ${order.id.slice(0, 8)}`}
+                timestamp={new Intl.DateTimeFormat('en-IN', {
+                  timeZone: 'Asia/Kolkata',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  day: 'numeric',
+                  month: 'short'
+                }).format(new Date(order.created_at))}
+                summary={
+                  <p>
+                    Placed by {formatOrderIdentity(order.ordered_by_name, order.ordered_by_phone)} ·{' '}
+                    <StatusBadge>{order.status}</StatusBadge>
+                  </p>
+                }
+                items={(order.order_items ?? []).map((item, index) => ({
+                  id: `${order.id}-${index}`,
+                  name: item.item_name,
+                  quantity: item.quantity,
+                  total: toPrice(item.line_total_cents)
+                }))}
+                note={order.note}
+                total={toPrice(order.total_cents)}
+              />
             ))
           ) : (
-            <article className="card">
-              <p className="eyebrow">No orders yet</p>
-              <h2>Your order history is empty</h2>
-              <p>Place your first order from the menu page and it will appear here.</p>
-            </article>
+            <EmptyStateCard
+              eyebrow="No orders yet"
+              title="Your order history is empty"
+              description="Place your first order from the menu page and it will appear here."
+              density="default"
+            />
           )}
         </div>
       </section>

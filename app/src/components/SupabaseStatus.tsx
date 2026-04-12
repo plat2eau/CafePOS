@@ -1,3 +1,5 @@
+import { SectionCard } from '@/components/ui/section-card'
+import { SummaryRow } from '@/components/ui/summary-row'
 import { publicEnv } from '@/lib/config'
 import { getSchemaReadinessReport } from '@/lib/schema-readiness'
 
@@ -15,7 +17,7 @@ export default async function SupabaseStatus() {
   const report = await getSchemaReadinessReport()
 
   return (
-    <article className={`card ${report.ok ? 'supportCard' : 'warningCard'}`}>
+    <SectionCard tone={report.ok ? 'support' : 'warning'}>
       <p className="eyebrow">Environment</p>
       <h2>Supabase Readiness</h2>
       <p>
@@ -27,12 +29,12 @@ export default async function SupabaseStatus() {
       </p>
       <div className="stack">
         {report.checks.map((check) => (
-          <div className="summaryRow" key={check.id}>
+          <SummaryRow key={check.id}>
             <span>{check.label}</span>
             <span className={check.ok ? 'readinessBadge ready' : 'readinessBadge blocked'}>
               {check.ok ? 'Ready' : 'Needs fix'}
             </span>
-          </div>
+          </SummaryRow>
         ))}
       </div>
       {!report.ok ? (
@@ -40,6 +42,6 @@ export default async function SupabaseStatus() {
           Apply the latest Supabase migrations to the connected project before running live trials.
         </p>
       ) : null}
-    </article>
+    </SectionCard>
   )
 }

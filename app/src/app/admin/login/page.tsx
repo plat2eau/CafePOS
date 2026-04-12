@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { EmptyStateCard } from '@/components/AppCards'
 import AdminLoginForm from '@/components/AdminLoginForm'
+import { SectionCard } from '@/components/ui/section-card'
 import { getAdminAuthContext } from '@/lib/admin-auth'
 
 type AdminLoginPageProps = {
@@ -33,24 +35,28 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
           </p>
         </div>
 
-        <article className="card sessionGateCard">
+        <SectionCard
+          className="mx-auto max-w-[760px] bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.08),transparent_34%),var(--card-bg-strong)]"
+        >
           <p className="eyebrow">Secure access</p>
           <h2>Open the staff console</h2>
           <p>Use your staff credentials to enter the live sessions and order management area.</p>
           <AdminLoginForm initialError={error} />
-        </article>
+        </SectionCard>
 
         <div className="compactGrid">
-          <article className="card">
-            <p className="eyebrow">Required</p>
-            <h2>Supabase Auth user</h2>
-            <p>The email and password must belong to a valid user in your Supabase project.</p>
-          </article>
-          <article className="card">
-            <p className="eyebrow">Required</p>
-            <h2>Staff profile row</h2>
-            <p>That user also needs a matching `staff_profiles.user_id` entry with `staff` or `admin`.</p>
-          </article>
+          <EmptyStateCard
+            eyebrow="Required"
+            title="Supabase Auth user"
+            description="The email and password must belong to a valid user in your Supabase project."
+            density="default"
+          />
+          <EmptyStateCard
+            eyebrow="Required"
+            title="Staff profile row"
+            description="That user also needs a matching `staff_profiles.user_id` entry with `staff` or `admin`."
+            density="default"
+          />
         </div>
       </section>
     </main>

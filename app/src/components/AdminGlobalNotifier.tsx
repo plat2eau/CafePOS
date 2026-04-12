@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { ActionGroup } from '@/components/ui/action-group'
+import { Button } from '@/components/ui/button'
+import { SectionCard } from '@/components/ui/section-card'
+import { SummaryRow } from '@/components/ui/summary-row'
 import type { AdminOrder, AdminOverviewData, AdminServiceRequest } from '@/lib/admin-data'
 
 type AdminGlobalNotifierProps = {
@@ -353,60 +357,70 @@ export default function AdminGlobalNotifier({
   return (
     <div className="adminNotifierStack" aria-live="polite" aria-atomic="false">
       {!isSoundReady && !isSoundPromptDismissed ? (
-        <article className="card supportCard adminAlertPopup">
-          <div className="summaryRow">
+        <SectionCard as="article" className="adminAlertPopup" tone="support">
+          <SummaryRow>
             <p className="eyebrow">Alert sound</p>
-            <button
-              className="popupCloseButton"
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               aria-label="Close alert sound prompt"
               onClick={dismissSoundPrompt}
             >
               Close
-            </button>
-          </div>
+            </Button>
+          </SummaryRow>
           <h2>Enable notification sound</h2>
           <p>Browsers often require one manual tap before new-order sounds can play automatically.</p>
-          <div className="buttonRow">
+          <ActionGroup>
             {!isTestingSound ? (
-              <button className="button" type="button" onClick={() => void unlockAndTestSound()}>
+              <Button size="form" className="md:w-auto" type="button" onClick={() => void unlockAndTestSound()}>
                 Enable and test sound
-              </button>
+              </Button>
             ) : null}
             {isTestingSound ? (
-              <button className="button" type="button" onClick={stopTestingSound}>
+              <Button size="form" className="md:w-auto" type="button" onClick={stopTestingSound}>
                 Stop sound
-              </button>
+              </Button>
             ) : null}
             {isTestingSound ? (
-              <button className="button buttonSecondary" type="button" onClick={confirmSoundReady}>
+              <Button
+                variant="secondary"
+                size="form"
+                className="md:w-auto"
+                type="button"
+                onClick={confirmSoundReady}
+              >
                 Yes, it works
-              </button>
+              </Button>
             ) : null}
-          </div>
+          </ActionGroup>
           {soundStatusMessage ? <p className="finePrint">{soundStatusMessage}</p> : null}
-        </article>
+        </SectionCard>
       ) : null}
 
       {notices.map((notice) => (
-        <article className="card supportCard adminAlertPopup" key={notice.id}>
+        <SectionCard as="article" className="adminAlertPopup" key={notice.id} tone="support">
           <p className="eyebrow">{notice.kind === 'order' ? 'New order' : 'Server call'}</p>
           <h2>{notice.title}</h2>
           <p>{notice.message}</p>
-          <div className="buttonRow">
-            <button
-              className="button"
+          <ActionGroup>
+            <Button
+              size="form"
+              className="md:w-auto"
               type="button"
               onClick={() => {
                 stopAlertSound()
                 dismissNotice(notice.id)
-                router.push(notice.tableId ? `/admin/sessions/${notice.tableId}` : '/admin/sessions')
+                router.push('/admin/sessions')
               }}
             >
-              {notice.tableId ? 'Open table session' : 'Open sessions'}
-            </button>
-            <button
-              className="button buttonSecondary"
+              Open sessions
+            </Button>
+            <Button
+              variant="secondary"
+              size="form"
+              className="md:w-auto"
               type="button"
               onClick={() => {
                 stopAlertSound()
@@ -414,9 +428,9 @@ export default function AdminGlobalNotifier({
               }}
             >
               Dismiss
-            </button>
-          </div>
-        </article>
+            </Button>
+          </ActionGroup>
+        </SectionCard>
       ))}
     </div>
   )

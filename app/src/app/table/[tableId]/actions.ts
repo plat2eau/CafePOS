@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   getTableOrderIdentityCookieName,
+  getTableSessionCookieOptions,
   getTableSessionCookieName,
   parseTableOrderIdentityCookie,
   serializeTableOrderIdentityCookie,
@@ -57,13 +58,7 @@ async function setTableOrderIdentityCookie(tableId: string, identity: TableOrder
   cookieStore.set(
     getTableOrderIdentityCookieName(tableId),
     serializeTableOrderIdentityCookie(identity),
-    {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 60 * 60 * 8
-    }
+    getTableSessionCookieOptions()
   )
 }
 
@@ -195,13 +190,11 @@ export async function createOrRefreshTableSession(
     }
   }
 
-  cookieStore.set(getTableSessionCookieName(tableId), sessionMutation.data.id, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 60 * 60 * 8
-  })
+  cookieStore.set(
+    getTableSessionCookieName(tableId),
+    sessionMutation.data.id,
+    getTableSessionCookieOptions()
+  )
   await setTableOrderIdentityCookie(tableId, orderIdentity)
 
   revalidatePath(`/table/${tableId}`)

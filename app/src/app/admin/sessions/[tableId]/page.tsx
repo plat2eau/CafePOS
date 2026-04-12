@@ -1,7 +1,4 @@
-import AdminSessionHeartbeat from '@/components/AdminSessionHeartbeat'
-import AdminTableDetailClient from '@/components/AdminTableDetailClient'
-import { requireAdminAuth } from '@/lib/admin-auth'
-import { getAdminTableDetailData } from '@/lib/admin-data'
+import { redirect } from 'next/navigation'
 
 type AdminSessionDetailPageProps = {
   params: Promise<{
@@ -10,22 +7,7 @@ type AdminSessionDetailPageProps = {
 }
 
 export default async function AdminSessionDetailPage({
-  params
+  params: _params
 }: AdminSessionDetailPageProps) {
-  const auth = await requireAdminAuth()
-  const { tableId } = await params
-  const initialData = await getAdminTableDetailData(tableId)
-
-  return (
-    <main>
-      <section className="hero heroShell">
-        <AdminSessionHeartbeat />
-        <AdminTableDetailClient
-          tableId={tableId}
-          signedInLabel={auth.profile.display_name ?? auth.email ?? 'Staff'}
-          initialData={initialData}
-        />
-      </section>
-    </main>
-  )
+  redirect('/admin/sessions')
 }

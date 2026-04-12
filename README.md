@@ -10,6 +10,16 @@ Fresh restart of CafePOS using:
 - `app`: Next.js application
 - `supabase`: local Supabase config, migrations, and seed data
 
+## UI Structure
+
+The app UI layer is standardized around:
+
+- `app/src/components/ui/*` for primitives
+- `app/src/components/*` for app-level shared compositions
+- route files for screen assembly
+
+See [app/UI_COMPOSITION.md](app/UI_COMPOSITION.md) for the current defaults and the legacy patterns that should not be reintroduced.
+
 ## Run
 
 Install dependencies:
