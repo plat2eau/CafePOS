@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
 import GuestOrderHistoryPoller from '@/components/GuestOrderHistoryPoller'
+import { getAdminAuthContext } from '@/lib/admin-auth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getTableSessionCookieName } from '@/lib/table-session'
 
@@ -26,20 +27,30 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
   const supabase = createServerSupabaseClient()
   const cookieStore = await cookies()
   const currentSessionId = cookieStore.get(getTableSessionCookieName(tableId))?.value
+  const adminAuth = await getAdminAuthContext()
 
-  const { data: orders, error } = currentSessionId
+  const { data: activeSession } = await supabase
+    .from('table_sessions')
+    .select('id')
+    .eq('table_id', tableId)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  const accessibleSessionId = currentSessionId ?? (adminAuth ? activeSession?.id ?? null : null)
+
+  const { data: orders, error } = accessibleSessionId
     ? await supabase
         .from('orders')
         .select('id, table_id, created_at, status, note, total_cents, ordered_by_name, ordered_by_phone, order_items(item_name, quantity, line_total_cents)')
         .eq('table_id', tableId)
-        .eq('session_id', currentSessionId)
+        .eq('session_id', accessibleSessionId)
         .order('created_at', { ascending: false })
     : { data: null, error: null }
 
   return (
     <main>
       <section className="hero heroShell">
-        {currentSessionId ? <GuestOrderHistoryPoller /> : null}
+        {accessibleSessionId ? <GuestOrderHistoryPoller /> : null}
 
         <div className="heroHeader compact">
           <Link className="backLink" href={`/table/${tableId}`}>
@@ -50,9 +61,11 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
           <p className="lead">
             This route will show only the orders associated with the active table session.
           </p>
-          {currentSessionId ? (
+          {accessibleSessionId ? (
             <div className="metaPillRow">
-              <span className="metaPill">Auto-refreshes every 5 seconds</span>
+              <span className="metaPill">
+                {adminAuth ? 'Admin preview mode' : 'Auto-refreshes every 5 seconds'}
+              </span>
             </div>
           ) : null}
         </div>
@@ -66,7 +79,7 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
         ) : null}
 
         <div className="compactGrid">
-          {!currentSessionId ? (
+          {!accessibleSessionId ? (
             <article className="card supportCard">
               <p className="eyebrow">Session required</p>
               <h2>No linked table session</h2>

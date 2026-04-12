@@ -9,6 +9,7 @@ import {
 import GuestSessionForm from '@/components/GuestSessionForm'
 import GuestOrderingExperience from '@/components/GuestOrderingExperience'
 import GuestServiceRequestPanel from '@/components/GuestServiceRequestPanel'
+import { getAdminAuthContext } from '@/lib/admin-auth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 import {
@@ -36,11 +37,13 @@ export default async function TablePage({ params }: TablePageProps) {
   )
 
   const [
+    adminAuth,
     { data: table, error: tableError },
     { data: activeSession, error: activeSessionError },
     { data: categories, error: categoriesError },
     { data: items, error: itemsError }
   ] = await Promise.all([
+    getAdminAuthContext(),
     supabase
       .from('tables')
       .select('id, label, is_active')
@@ -68,7 +71,10 @@ export default async function TablePage({ params }: TablePageProps) {
   const sessionAction = createOrRefreshTableSession.bind(null, tableId)
   const placeOrderAction = placeOrderForTable.bind(null, tableId)
   const serviceRequestAction = createServiceRequestForTable.bind(null, tableId)
-  const canAccessOrdering = Boolean(activeSession && isCurrentGuestSession)
+  const isAdminPreview = Boolean(adminAuth)
+  const canAccessOrdering = Boolean(
+    table?.is_active && (isAdminPreview || (activeSession && isCurrentGuestSession))
+  )
   const activeOrdererName = orderIdentity?.name ?? activeSession?.guest_name ?? ''
 
   const itemsByCategory = new Map<string, MenuItem[]>(
@@ -164,28 +170,47 @@ export default async function TablePage({ params }: TablePageProps) {
           </article>
         )}
 
-        {!hasError && table && table.is_active && canAccessOrdering && activeSession && (
+        {!hasError && table && table.is_active && canAccessOrdering && (activeSession || isAdminPreview) && (
           <div className="sectionStack">
             <article className="card supportCard guestBanner">
-              <p className="eyebrow">Ready to order</p>
-              <h2>Ordering as {activeOrdererName || activeSession.guest_name}</h2>
-              <p>Pick your favourites and send your order whenever you are ready.</p>
-              <div className="metaPillRow">
-                <span className="metaPill">
-                  Session PIN <strong>{activeSession.session_pin}</strong>
-                </span>
-              </div>
-              <p className="finePrint">
-                Share this PIN only with someone joining this same table on another device.
+              <p className="eyebrow">{isAdminPreview ? 'Admin preview' : 'Ready to order'}</p>
+              <h2>
+                {isAdminPreview
+                  ? activeSession
+                    ? `Previewing ${activeSession.guest_name}'s table`
+                    : `Previewing table ${tableId}`
+                  : `Ordering as ${activeOrdererName || activeSession?.guest_name || 'Guest'}`}
+              </h2>
+              <p>
+                {isAdminPreview
+                  ? 'You are viewing the guest experience as staff. Ordering and service actions are disabled in preview mode.'
+                  : 'Pick your favourites and send your order whenever you are ready.'}
               </p>
+              {activeSession ? (
+                <>
+                  <div className="metaPillRow">
+                    <span className="metaPill">
+                      Session PIN <strong>{activeSession.session_pin}</strong>
+                    </span>
+                  </div>
+                  <p className="finePrint">
+                    Share this PIN only with someone joining this same table on another device.
+                  </p>
+                </>
+              ) : null}
             </article>
-            <GuestServiceRequestPanel action={serviceRequestAction} />
+            <GuestServiceRequestPanel action={serviceRequestAction} previewMode={isAdminPreview} />
             <GuestOrderingExperience
               tableId={tableId}
               categories={categories ?? []}
               items={items ?? []}
               action={placeOrderAction}
-              guestName={activeOrdererName || activeSession.guest_name}
+              guestName={
+                isAdminPreview
+                  ? adminAuth?.profile.display_name ?? adminAuth?.email ?? 'Admin preview'
+                  : activeOrdererName || activeSession?.guest_name || 'Guest'
+              }
+              previewMode={isAdminPreview}
             />
           </div>
         )}

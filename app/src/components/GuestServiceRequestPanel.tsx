@@ -9,6 +9,7 @@ type GuestServiceRequestPanelProps = {
     state: ServiceRequestActionState,
     formData: FormData
   ) => Promise<ServiceRequestActionState>
+  previewMode?: boolean
 }
 
 const initialState: ServiceRequestActionState = {
@@ -16,7 +17,8 @@ const initialState: ServiceRequestActionState = {
 }
 
 export default function GuestServiceRequestPanel({
-  action
+  action,
+  previewMode = false
 }: GuestServiceRequestPanelProps) {
   const [state, formAction] = useActionState(action, initialState)
   const [isOpen, setIsOpen] = useState(false)
@@ -28,13 +30,17 @@ export default function GuestServiceRequestPanel({
       <h2>Call the server</h2>
       <p>Use this if you are ready to pay or need anything else from the cafe team.</p>
 
-      {!isOpen ? (
+      {previewMode ? (
+        <p className="finePrint">Admin preview: service requests are disabled in guest view preview mode.</p>
+      ) : null}
+
+      {!isOpen && !previewMode ? (
         <div className="buttonRow">
           <button className="button" type="button" onClick={() => setIsOpen(true)}>
             Call server
           </button>
         </div>
-      ) : (
+      ) : !previewMode ? (
         <form action={formAction} className="sessionForm">
           <div className="requestTypeRow">
             <button
@@ -85,7 +91,7 @@ export default function GuestServiceRequestPanel({
             </p>
           ) : null}
         </form>
-      )}
+      ) : null}
     </article>
   )
 }

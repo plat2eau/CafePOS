@@ -1,9 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState } from 'react'
+import { useActionState, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PlaceOrderActionState } from '@/app/table/[tableId]/actions'
 import FormActionButton from '@/components/FormActionButton'
+import SearchBar from '@/components/SearchBar'
 
 type MenuCategory = {
   id: string
@@ -27,6 +28,7 @@ type GuestOrderingExperienceProps = {
     formData: FormData
   ) => Promise<PlaceOrderActionState>
   guestName: string
+  previewMode?: boolean
 }
 
 const initialState: PlaceOrderActionState = {
@@ -45,32 +47,53 @@ export default function GuestOrderingExperience({
   categories,
   items,
   action,
-  guestName
+  guestName,
+  previewMode = false
 }: GuestOrderingExperienceProps) {
   const router = useRouter()
   const [state, formAction] = useActionState(action, initialState)
   const [note, setNote] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [searchQuery, setSearchQuery] = useState('')
   const [showSuccessCard, setShowSuccessCard] = useState(false)
   const [isOrderSheetOpen, setIsOrderSheetOpen] = useState(false)
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
-  const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? '')
+  const deferredSearchQuery = useDeferredValue(searchQuery)
+  const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
+
+  const filteredItems = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return items
+    }
+
+    return items.filter((item) => {
+      const haystack = `${item.name} ${item.description ?? ''}`.toLowerCase()
+      return haystack.includes(normalizedSearchQuery)
+    })
+  }, [items, normalizedSearchQuery])
+
+  const filteredCategoryIds = useMemo(
+    () => new Set(filteredItems.map((item) => item.category_id)),
+    [filteredItems]
+  )
 
   const categorySections = useMemo(
     () =>
-      categories.map((category) => ({
-        ...category,
-        anchorId: `menu-category-${category.id}`
-      })),
-    [categories]
+      categories
+        .filter((category) => filteredCategoryIds.has(category.id))
+        .map((category) => ({
+          ...category,
+          anchorId: `menu-category-${category.id}`
+        })),
+    [categories, filteredCategoryIds]
   )
 
   const itemsByCategory = useMemo(() => {
     const map = new Map<string, MenuItem[]>(
-      categories.map((category) => [category.id, []])
+      categorySections.map((category) => [category.id, []])
     )
 
-    for (const item of items) {
+    for (const item of filteredItems) {
       const list = map.get(item.category_id)
       if (list) {
         list.push(item)
@@ -80,7 +103,9 @@ export default function GuestOrderingExperience({
     }
 
     return map
-  }, [categories, items])
+  }, [categorySections, filteredItems])
+
+  const [activeCategoryId, setActiveCategoryId] = useState(categorySections[0]?.id ?? '')
 
   const selectedItems = useMemo(
     () =>
@@ -203,6 +228,10 @@ export default function GuestOrderingExperience({
     setIsOrderSheetOpen((current) => !current)
   }
 
+  const searchSummary = normalizedSearchQuery
+    ? `${filteredItems.length} matching item${filteredItems.length === 1 ? '' : 's'}`
+    : `${items.length} item${items.length === 1 ? '' : 's'} on the menu`
+
   return (
     <form action={formAction} className="sectionStack">
       <input
@@ -231,59 +260,79 @@ export default function GuestOrderingExperience({
             </article>
           ) : null}
 
+          <div className="menuSearchBarWrap">
+            <SearchBar
+              label="Menu search"
+              placeholder="Search coffee, tea, snacks..."
+              value={searchQuery}
+              onChange={setSearchQuery}
+              summary={searchSummary}
+            />
+          </div>
+
           <div className="grid">
-            {categorySections.map((category) => (
-              <article
-                className="card menuCategoryCard"
-                key={category.id}
-                id={category.anchorId}
-                data-category-id={category.id}
-              >
-                <p className="eyebrow">{category.name}</p>
-                <h2>{category.name}</h2>
-                {(itemsByCategory.get(category.id) ?? []).length === 0 ? (
-                  <p>No available items in this category yet.</p>
-                ) : (
-                  <div className="stack">
-                    {(itemsByCategory.get(category.id) ?? []).map((item) => {
-                      const quantity = quantities[item.id] ?? 0
-
-                      return (
-                        <div className="menuItem" key={item.id}>
-                          <div className="sectionStack compact">
-                            <div>
-                              <h3>{item.name}</h3>
-                              {item.description ? <p>{item.description}</p> : null}
-                            </div>
-                            <strong>{toPrice(item.price_cents)}</strong>
-                          </div>
-
-                          <div className="quantityControls">
-                            <button
-                              className="quantityButton"
-                              type="button"
-                              onClick={() => adjustQuantity(item.id, -1)}
-                              aria-label={`Remove one ${item.name}`}
-                            >
-                              -
-                            </button>
-                            <span className="quantityValue">{quantity}</span>
-                            <button
-                              className="quantityButton"
-                              type="button"
-                              onClick={() => adjustQuantity(item.id, 1)}
-                              aria-label={`Add one ${item.name}`}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+            {categorySections.length === 0 ? (
+              <article className="card supportCard">
+                <p className="eyebrow">No matches</p>
+                <h2>No menu items found</h2>
+                <p>Try a different search term to find something from the menu.</p>
               </article>
-            ))}
+            ) : (
+              categorySections.map((category) => (
+                <article
+                  className="card menuCategoryCard"
+                  key={category.id}
+                  id={category.anchorId}
+                  data-category-id={category.id}
+                >
+                  <p className="eyebrow">{category.name}</p>
+                  <h2>{category.name}</h2>
+                  {(itemsByCategory.get(category.id) ?? []).length === 0 ? (
+                    <p>No available items in this category yet.</p>
+                  ) : (
+                    <div className="stack">
+                      {(itemsByCategory.get(category.id) ?? []).map((item) => {
+                        const quantity = quantities[item.id] ?? 0
+
+                        return (
+                          <div className="menuItem" key={item.id}>
+                            <div className="sectionStack compact">
+                              <div>
+                                <h3>{item.name}</h3>
+                                {item.description ? <p>{item.description}</p> : null}
+                              </div>
+                              <strong>{toPrice(item.price_cents)}</strong>
+                            </div>
+
+                            <div className="quantityControls">
+                              <button
+                                className="quantityButton"
+                                type="button"
+                                disabled={previewMode}
+                                onClick={() => adjustQuantity(item.id, -1)}
+                                aria-label={`Remove one ${item.name}`}
+                              >
+                                -
+                              </button>
+                              <span className="quantityValue">{quantity}</span>
+                              <button
+                                className="quantityButton"
+                                type="button"
+                                disabled={previewMode}
+                                onClick={() => adjustQuantity(item.id, 1)}
+                                aria-label={`Add one ${item.name}`}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </article>
+              ))
+            )}
           </div>
         </div>
 
@@ -357,6 +406,7 @@ export default function GuestOrderingExperience({
                   name="note"
                   rows={4}
                   placeholder="Extra hot, less sugar, no onions..."
+                  disabled={previewMode}
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
                 />
@@ -364,11 +414,15 @@ export default function GuestOrderingExperience({
 
               <div className="formFooter">
                 <FormActionButton
-                  label="Place order"
+                  label={previewMode ? 'Preview mode' : 'Place order'}
                   loadingLabel="Placing order..."
-                  disabled={selectedItems.length === 0}
+                  disabled={previewMode || selectedItems.length === 0}
                 />
-                <p className="finePrint">Your order will go straight to the cafe team.</p>
+                <p className="finePrint">
+                  {previewMode
+                    ? 'Admin preview: ordering is disabled in guest view preview mode.'
+                    : 'Your order will go straight to the cafe team.'}
+                </p>
               </div>
 
               {state.status === 'error' ? (
@@ -379,10 +433,10 @@ export default function GuestOrderingExperience({
             <button
               className="button"
               type="button"
-              disabled={selectedItems.length === 0}
+              disabled={previewMode || selectedItems.length === 0}
               onClick={() => setIsOrderSheetOpen(true)}
             >
-              Place order
+              {previewMode ? 'Preview mode' : 'Place order'}
             </button>
           )}
         </div>
