@@ -122,6 +122,8 @@ export type Database = {
           created_at: string
           id: string
           note: string | null
+          ordered_by_name: string
+          ordered_by_phone: string
           session_id: string
           status: 'placed' | 'preparing' | 'served' | 'cancelled'
           table_id: string
@@ -133,6 +135,8 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
+          ordered_by_name: string
+          ordered_by_phone: string
           session_id: string
           status?: 'placed' | 'preparing' | 'served' | 'cancelled'
           table_id: string
@@ -144,6 +148,8 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
+          ordered_by_name?: string
+          ordered_by_phone?: string
           session_id?: string
           status?: 'placed' | 'preparing' | 'served' | 'cancelled'
           table_id?: string
@@ -245,6 +251,7 @@ export type Database = {
           guest_phone: string
           id: string
           last_active_at: string
+          session_pin: string
           started_at: string
           status: 'active' | 'closed'
           table_id: string
@@ -257,6 +264,7 @@ export type Database = {
           guest_phone: string
           id?: string
           last_active_at?: string
+          session_pin?: string
           started_at?: string
           status?: 'active' | 'closed'
           table_id: string
@@ -269,6 +277,7 @@ export type Database = {
           guest_phone?: string
           id?: string
           last_active_at?: string
+          session_pin?: string
           started_at?: string
           status?: 'active' | 'closed'
           table_id?: string

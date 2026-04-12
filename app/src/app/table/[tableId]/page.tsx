@@ -11,7 +11,11 @@ import GuestOrderingExperience from '@/components/GuestOrderingExperience'
 import GuestServiceRequestPanel from '@/components/GuestServiceRequestPanel'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
-import { getTableSessionCookieName } from '@/lib/table-session'
+import {
+  getTableOrderIdentityCookieName,
+  getTableSessionCookieName,
+  parseTableOrderIdentityCookie
+} from '@/lib/table-session'
 
 type TablePageProps = {
   params: Promise<{
@@ -27,6 +31,9 @@ export default async function TablePage({ params }: TablePageProps) {
   const supabase = createServerSupabaseClient()
   const cookieStore = await cookies()
   const currentSessionId = cookieStore.get(getTableSessionCookieName(tableId))?.value
+  const orderIdentity = parseTableOrderIdentityCookie(
+    cookieStore.get(getTableOrderIdentityCookieName(tableId))?.value
+  )
 
   const [
     { data: table, error: tableError },
@@ -41,7 +48,7 @@ export default async function TablePage({ params }: TablePageProps) {
       .maybeSingle(),
     supabase
       .from('table_sessions')
-      .select('id, guest_name, guest_phone, last_active_at, status')
+      .select('id, guest_name, guest_phone, last_active_at, session_pin, status')
       .eq('table_id', tableId)
       .eq('status', 'active')
       .maybeSingle(),
@@ -62,6 +69,7 @@ export default async function TablePage({ params }: TablePageProps) {
   const placeOrderAction = placeOrderForTable.bind(null, tableId)
   const serviceRequestAction = createServiceRequestForTable.bind(null, tableId)
   const canAccessOrdering = Boolean(activeSession && isCurrentGuestSession)
+  const activeOrdererName = orderIdentity?.name ?? activeSession?.guest_name ?? ''
 
   const itemsByCategory = new Map<string, MenuItem[]>(
     (categories ?? []).map((category: MenuCategory) => [category.id, []])
@@ -129,13 +137,21 @@ export default async function TablePage({ params }: TablePageProps) {
           <article className="card sessionGateCard">
             <p className="eyebrow">Welcome</p>
             <h2>Start your table order</h2>
-            <p className="lead">Share your details to open the menu for this table.</p>
+            <p className="lead">
+              {activeSession && !isCurrentGuestSession
+                ? 'This table is already in session. Enter your details and the table PIN to join from this device.'
+                : 'Share your details to open the menu for this table.'}
+            </p>
             {activeSession ? (
               <div className="compactGrid">
                 <article className="card supportCard">
                   <p className="eyebrow">Already active</p>
                   <h2>{activeSession.guest_name}</h2>
-                  <p>Continue with this table by confirming your details below.</p>
+                  <p>
+                    {isCurrentGuestSession
+                      ? 'Continue with this table by confirming your details below.'
+                      : 'Use your own name and phone, then enter the session PIN from staff or the person who started this table.'}
+                  </p>
                 </article>
               </div>
             ) : null}
@@ -143,6 +159,7 @@ export default async function TablePage({ params }: TablePageProps) {
               action={sessionAction}
               initialName={isCurrentGuestSession ? activeSession?.guest_name : ''}
               initialPhone={isCurrentGuestSession ? activeSession?.guest_phone : ''}
+              requirePin={Boolean(activeSession && !isCurrentGuestSession)}
             />
           </article>
         )}
@@ -151,8 +168,16 @@ export default async function TablePage({ params }: TablePageProps) {
           <div className="sectionStack">
             <article className="card supportCard guestBanner">
               <p className="eyebrow">Ready to order</p>
-              <h2>Ordering as {activeSession.guest_name}</h2>
+              <h2>Ordering as {activeOrdererName || activeSession.guest_name}</h2>
               <p>Pick your favourites and send your order whenever you are ready.</p>
+              <div className="metaPillRow">
+                <span className="metaPill">
+                  Session PIN <strong>{activeSession.session_pin}</strong>
+                </span>
+              </div>
+              <p className="finePrint">
+                Share this PIN only with someone joining this same table on another device.
+              </p>
             </article>
             <GuestServiceRequestPanel action={serviceRequestAction} />
             <GuestOrderingExperience
@@ -160,7 +185,7 @@ export default async function TablePage({ params }: TablePageProps) {
               categories={categories ?? []}
               items={items ?? []}
               action={placeOrderAction}
-              guestName={activeSession.guest_name}
+              guestName={activeOrdererName || activeSession.guest_name}
             />
           </div>
         )}

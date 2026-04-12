@@ -30,7 +30,7 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
   const { data: orders, error } = currentSessionId
     ? await supabase
         .from('orders')
-        .select('id, table_id, created_at, status, note, total_cents, order_items(item_name, quantity, line_total_cents)')
+        .select('id, table_id, created_at, status, note, total_cents, ordered_by_name, ordered_by_phone, order_items(item_name, quantity, line_total_cents)')
         .eq('table_id', tableId)
         .eq('session_id', currentSessionId)
         .order('created_at', { ascending: false })
@@ -85,6 +85,9 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
                   <strong>Order {order.id.slice(0, 8)}</strong>
                   <span>{order.status}</span>
                 </div>
+                <p>
+                  Placed by {order.ordered_by_name} ({order.ordered_by_phone})
+                </p>
                 <div className="stack">
                   {(order.order_items ?? []).map((item, index) => (
                     <div className="summaryRow" key={`${order.id}-${index}`}>

@@ -108,7 +108,7 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
                     <span>{formatTimestamp(order.created_at)}</span>
                   </div>
                   <p>
-                    {order.guest_name ?? 'Guest'} · {order.status}
+                    {order.ordered_by_name} ({order.ordered_by_phone}) · {order.status}
                   </p>
                   <div className="stack">
                     {order.items.map((item, index) => (
@@ -152,6 +152,9 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
                     </div>
                     <p>{session.guest_name}</p>
                     <p>{session.guest_phone}</p>
+                    <p>
+                      Session PIN <strong>{session.session_pin}</strong>
+                    </p>
                     <p>Last active {formatTimestamp(session.last_active_at)}</p>
                     <Link className="button buttonSecondary" href={`/admin/sessions/${session.table_id}`}>
                       Open table

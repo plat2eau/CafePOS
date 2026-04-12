@@ -11,6 +11,7 @@ type GuestSessionFormProps = {
   ) => Promise<GuestSessionActionState>
   initialName?: string
   initialPhone?: string
+  requirePin?: boolean
 }
 
 const guestSessionInitialState: GuestSessionActionState = {
@@ -20,7 +21,8 @@ const guestSessionInitialState: GuestSessionActionState = {
 export default function GuestSessionForm({
   action,
   initialName = '',
-  initialPhone = ''
+  initialPhone = '',
+  requirePin = false
 }: GuestSessionFormProps) {
   const [state, formAction] = useActionState(action, guestSessionInitialState)
 
@@ -51,9 +53,30 @@ export default function GuestSessionForm({
         />
       </div>
 
+      {requirePin ? (
+        <div className="formField">
+          <label htmlFor="session-pin">Session PIN</label>
+          <input
+            id="session-pin"
+            name="pin"
+            type="password"
+            inputMode="numeric"
+            pattern="[0-9]{4}"
+            minLength={4}
+            maxLength={4}
+            placeholder="4-digit PIN"
+            required
+          />
+        </div>
+      ) : null}
+
       <div className="formFooter">
         <FormActionButton label="Continue to menu" loadingLabel="Opening your table..." />
-        <p className="finePrint">These details are only used for your current table order.</p>
+        <p className="finePrint">
+          {requirePin
+            ? 'Enter your own details, then use the active session PIN to join this table from this device.'
+            : 'These details are only used for your current table order.'}
+        </p>
       </div>
 
       {state.status !== 'idle' ? (

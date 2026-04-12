@@ -360,6 +360,9 @@ export default function AdminTableDetailClient({
                       <strong>{activeSession.guest_name}</strong>
                     </p>
                     <p>{activeSession.guest_phone}</p>
+                    <p>
+                      Session PIN <strong>{activeSession.session_pin}</strong>
+                    </p>
                     <p>Started {formatTimestamp(activeSession.started_at)}</p>
                     <p>Last active {formatTimestamp(activeSession.last_active_at)}</p>
                   </div>
@@ -432,7 +435,7 @@ export default function AdminTableDetailClient({
                       <span>{formatTimestamp(order.created_at)}</span>
                     </div>
                     <p>
-                      {order.guest_name ?? 'Guest'} · <span className="statusChip">{order.status}</span>
+                      {order.ordered_by_name} ({order.ordered_by_phone}) · <span className="statusChip">{order.status}</span>
                     </p>
                     <div className="stack">
                       {order.items.map((item, index) => (

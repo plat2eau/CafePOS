@@ -15,6 +15,8 @@ export type AdminOrder = {
   total_cents: number
   session_id: string
   guest_name: string | null
+  ordered_by_name: string
+  ordered_by_phone: string
   items: AdminOrderItem[]
 }
 
@@ -35,6 +37,7 @@ export type AdminSession = {
   guest_name: string
   guest_phone: string
   last_active_at: string
+  session_pin: string
   started_at?: string
   status?: 'active' | 'closed'
 }
@@ -58,6 +61,7 @@ export type AdminTableDetailData = {
     guest_phone: string
     started_at: string
     last_active_at: string
+    session_pin: string
     status: 'active' | 'closed'
   } | null
   recentOrders: AdminOrder[]
@@ -72,7 +76,7 @@ async function fetchOrdersWithItems(options?: {
   const supabase = createServerSupabaseClient()
   const ordersQuery = supabase
     .from('orders')
-    .select('id, table_id, created_at, status, note, total_cents, session_id')
+    .select('id, table_id, created_at, status, note, total_cents, session_id, ordered_by_name, ordered_by_phone')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(20)
@@ -143,7 +147,7 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   const supabase = createServerSupabaseClient()
   const { data: sessions, error: sessionsError } = await supabase
     .from('table_sessions')
-    .select('id, table_id, guest_name, guest_phone, last_active_at')
+    .select('id, table_id, guest_name, guest_phone, last_active_at, session_pin')
     .eq('status', 'active')
     .order('last_active_at', { ascending: false })
 
@@ -192,7 +196,7 @@ export async function getAdminTableDetailData(tableId: string): Promise<AdminTab
       .maybeSingle(),
     supabase
       .from('table_sessions')
-      .select('id, guest_name, guest_phone, started_at, last_active_at, status')
+      .select('id, guest_name, guest_phone, started_at, last_active_at, session_pin, status')
       .eq('table_id', tableId)
       .eq('status', 'active')
       .maybeSingle()

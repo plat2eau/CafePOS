@@ -3,7 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getTableSessionCookieName } from '@/lib/table-session'
+import {
+  getTableOrderIdentityCookieName,
+  getTableSessionCookieName,
+  parseTableOrderIdentityCookie,
+  serializeTableOrderIdentityCookie,
+  type TableOrderIdentity
+} from '@/lib/table-session'
 
 export type GuestSessionActionState = {
   status: 'idle' | 'success' | 'error'
@@ -22,6 +28,43 @@ export type ServiceRequestActionState = {
 
 function normalizePhone(value: string) {
   return value.replace(/\D/g, '')
+}
+
+function normalizePin(value: string) {
+  return value.replace(/\D/g, '').slice(0, 4)
+}
+
+function generateSessionPin() {
+  return String(Math.floor(Math.random() * 10000)).padStart(4, '0')
+}
+
+function getValidatedOrderIdentity(name: string, phone: string): TableOrderIdentity | null {
+  const normalizedName = name.trim()
+  const normalizedPhone = normalizePhone(phone)
+
+  if (!normalizedName || !/^\d{10}$/.test(normalizedPhone)) {
+    return null
+  }
+
+  return {
+    name: normalizedName,
+    phone: normalizedPhone
+  }
+}
+
+async function setTableOrderIdentityCookie(tableId: string, identity: TableOrderIdentity) {
+  const cookieStore = await cookies()
+  cookieStore.set(
+    getTableOrderIdentityCookieName(tableId),
+    serializeTableOrderIdentityCookie(identity),
+    {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 8
+    }
+  )
 }
 
 function normalizeOrderItems(rawValue: string) {
@@ -46,22 +89,19 @@ export async function createOrRefreshTableSession(
 ): Promise<GuestSessionActionState> {
   const name = String(formData.get('name') ?? '').trim()
   const phone = normalizePhone(String(formData.get('phone') ?? ''))
+  const providedPin = normalizePin(String(formData.get('pin') ?? ''))
+  const orderIdentity = getValidatedOrderIdentity(name, phone)
 
-  if (!name) {
+  if (!orderIdentity) {
     return {
       status: 'error',
-      message: 'Please enter a guest name.'
-    }
-  }
-
-  if (!/^\d{10}$/.test(phone)) {
-    return {
-      status: 'error',
-      message: 'Please enter a valid 10-digit phone number.'
+      message: 'Please enter a valid name and 10-digit phone number.'
     }
   }
 
   const supabase = createServerSupabaseClient()
+  const cookieStore = await cookies()
+  const currentSessionId = cookieStore.get(getTableSessionCookieName(tableId))?.value
 
   const { data: table, error: tableError } = await supabase
     .from('tables')
@@ -85,7 +125,7 @@ export async function createOrRefreshTableSession(
 
   const { data: existingSession, error: existingSessionError } = await supabase
     .from('table_sessions')
-    .select('id')
+    .select('id, session_pin')
     .eq('table_id', tableId)
     .eq('status', 'active')
     .maybeSingle()
@@ -98,24 +138,51 @@ export async function createOrRefreshTableSession(
   }
 
   const now = new Date().toISOString()
+  const isCurrentGuestSession = existingSession?.id === currentSessionId
+
+  if (existingSession && !isCurrentGuestSession) {
+    if (!/^\d{4}$/.test(providedPin)) {
+      return {
+        status: 'error',
+        message: 'Enter the 4-digit session PIN to open this table.'
+      }
+    }
+
+    if (providedPin !== existingSession.session_pin) {
+      return {
+        status: 'error',
+        message: 'That PIN is incorrect for this table.'
+      }
+    }
+  }
 
   const sessionMutation = existingSession
-    ? await supabase
-        .from('table_sessions')
-        .update({
-          guest_name: name,
-          guest_phone: phone,
-          last_active_at: now
-        })
-        .eq('id', existingSession.id)
-        .select('id')
-        .single()
+    ? isCurrentGuestSession
+      ? await supabase
+          .from('table_sessions')
+          .update({
+            guest_name: orderIdentity.name,
+            guest_phone: orderIdentity.phone,
+            last_active_at: now
+          })
+          .eq('id', existingSession.id)
+          .select('id')
+          .single()
+      : await supabase
+          .from('table_sessions')
+          .update({
+            last_active_at: now
+          })
+          .eq('id', existingSession.id)
+          .select('id')
+          .single()
     : await supabase
         .from('table_sessions')
         .insert({
           table_id: tableId,
-          guest_name: name,
-          guest_phone: phone,
+          guest_name: orderIdentity.name,
+          guest_phone: orderIdentity.phone,
+          session_pin: generateSessionPin(),
           last_active_at: now
         })
         .select('id')
@@ -128,7 +195,6 @@ export async function createOrRefreshTableSession(
     }
   }
 
-  const cookieStore = await cookies()
   cookieStore.set(getTableSessionCookieName(tableId), sessionMutation.data.id, {
     httpOnly: true,
     sameSite: 'lax',
@@ -136,14 +202,19 @@ export async function createOrRefreshTableSession(
     path: '/',
     maxAge: 60 * 60 * 8
   })
+  await setTableOrderIdentityCookie(tableId, orderIdentity)
 
   revalidatePath(`/table/${tableId}`)
   revalidatePath(`/table/${tableId}/orders`)
+  revalidatePath('/admin/sessions')
+  revalidatePath(`/admin/sessions/${tableId}`)
 
   return {
     status: 'success',
     message: existingSession
-      ? 'Your table session was refreshed.'
+      ? isCurrentGuestSession
+        ? 'Your table session was refreshed.'
+        : 'PIN verified. This table session is now open on this device.'
       : 'Your table session has started.'
   }
 }
@@ -167,6 +238,9 @@ export async function placeOrderForTable(
   const supabase = createServerSupabaseClient()
   const cookieStore = await cookies()
   const currentSessionId = cookieStore.get(getTableSessionCookieName(tableId))?.value
+  const storedIdentity = parseTableOrderIdentityCookie(
+    cookieStore.get(getTableOrderIdentityCookieName(tableId))?.value
+  )
 
   if (!currentSessionId) {
     return {
@@ -177,7 +251,7 @@ export async function placeOrderForTable(
 
   const { data: session, error: sessionError } = await supabase
     .from('table_sessions')
-    .select('id, table_id, status')
+    .select('id, table_id, status, guest_name, guest_phone')
     .eq('id', currentSessionId)
     .eq('table_id', tableId)
     .eq('status', 'active')
@@ -188,6 +262,20 @@ export async function placeOrderForTable(
       status: 'error',
       message: 'Your session is no longer active. Please refresh your session and try again.'
     }
+  }
+
+  const orderIdentity =
+    storedIdentity ?? getValidatedOrderIdentity(session.guest_name, session.guest_phone)
+
+  if (!orderIdentity) {
+    return {
+      status: 'error',
+      message: 'Your order identity is missing. Reopen the table and try again.'
+    }
+  }
+
+  if (!storedIdentity) {
+    await setTableOrderIdentityCookie(tableId, orderIdentity)
   }
 
   const uniqueItemIds = Array.from(new Set(requestedItems.map((item) => item.itemId)))
@@ -237,6 +325,8 @@ export async function placeOrderForTable(
     .insert({
       session_id: session.id,
       table_id: tableId,
+      ordered_by_name: orderIdentity.name,
+      ordered_by_phone: orderIdentity.phone,
       note: note || null,
       total_cents: totalCents
     })
