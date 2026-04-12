@@ -9,12 +9,12 @@ export type AdminOrderItem = {
 
 export type AdminOrder = {
   id: string
-  table_id: string
+  table_id: string | null
   created_at: string
   status: 'placed' | 'preparing' | 'served' | 'cancelled'
   note: string | null
   total_cents: number
-  session_id: string
+  session_id: string | null
   guest_name: string | null
   ordered_by_name: string
   ordered_by_phone: string
@@ -110,7 +110,13 @@ async function fetchOrdersWithItems(options?: {
     throw new Error('Could not load orders.')
   }
 
-  const sessionIds = Array.from(new Set((orders ?? []).map((order) => order.session_id)))
+  const sessionIds = Array.from(
+    new Set(
+      (orders ?? [])
+        .map((order) => order.session_id)
+        .filter((sessionId): sessionId is string => Boolean(sessionId))
+    )
+  )
   const orderIds = (orders ?? []).map((order) => order.id)
 
   const [{ data: orderItems, error: orderItemsError }, { data: sessionDetails, error: sessionDetailsError }] = await Promise.all([
@@ -149,7 +155,7 @@ async function fetchOrdersWithItems(options?: {
 
   return (orders ?? []).map((order) => ({
     ...order,
-    guest_name: sessionNameById.get(order.session_id) ?? null,
+    guest_name: order.session_id ? sessionNameById.get(order.session_id) ?? null : null,
     items: orderItemsByOrderId.get(order.id) ?? []
   }))
 }
@@ -167,9 +173,7 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   }
 
   const activeSessionIds = (sessions ?? []).map((session) => session.id)
-  const orders = await fetchOrdersWithItems({
-    sessionIds: activeSessionIds
-  })
+  const orders = await fetchOrdersWithItems()
   const { data: serviceRequests, error: serviceRequestsError } = activeSessionIds.length
     ? await supabase
         .from('service_requests')

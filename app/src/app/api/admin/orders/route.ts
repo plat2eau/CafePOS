@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { createReceiptToken } from '@/lib/receipt-print-server'
+import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import type { AdminOrder } from '@/lib/admin-data'
 
 type RequestedOrderItem = {
   itemId?: string
   quantity?: number
+}
+
+function normalizePhone(value: string) {
+  return value.trim()
 }
 
 export async function POST(request: Request) {
@@ -17,13 +24,19 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as
     | {
+        orderType?: 'table' | 'out'
         tableId?: string
+        customerName?: string
+        customerPhone?: string
         items?: RequestedOrderItem[]
         note?: string
       }
     | null
 
+  const orderType = body?.orderType === 'out' ? 'out' : 'table'
   const tableId = body?.tableId?.trim()
+  const customerName = body?.customerName?.trim() ?? ''
+  const customerPhone = normalizePhone(body?.customerPhone ?? '')
   const note = body?.note?.trim() || null
   const requestedItems = Array.isArray(body?.items)
     ? body.items
@@ -34,8 +47,12 @@ export async function POST(request: Request) {
         .filter((item) => item.itemId && Number.isInteger(item.quantity) && item.quantity > 0)
     : []
 
-  if (!tableId) {
+  if (orderType === 'table' && !tableId) {
     return NextResponse.json({ message: 'Choose a table first.' }, { status: 400 })
+  }
+
+  if (orderType === 'out' && !customerName) {
+    return NextResponse.json({ message: 'Enter a customer name for the out order.' }, { status: 400 })
   }
 
   if (requestedItems.length === 0) {
@@ -43,78 +60,87 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServerSupabaseClient()
-  const { data: table, error: tableError } = await supabase
-    .from('tables')
-    .select('id, is_active')
-    .eq('id', tableId)
-    .maybeSingle()
-
-  if (tableError || !table) {
-    return NextResponse.json({ message: 'That table could not be found.' }, { status: 404 })
-  }
-
-  if (!table.is_active) {
-    return NextResponse.json({ message: 'That table is inactive right now.' }, { status: 400 })
-  }
-
-  const { data: existingActiveSession, error: sessionError } = await supabase
-    .from('table_sessions')
-    .select('id')
-    .eq('table_id', tableId)
-    .eq('status', 'active')
-    .maybeSingle()
-
-  if (sessionError) {
-    return NextResponse.json({ message: 'Could not load the current table session.' }, { status: 500 })
-  }
-
-  let activeSessionId = existingActiveSession?.id ?? null
+  let activeSessionId: string | null = null
   let createdSession = false
 
-  if (!activeSessionId) {
-    const now = new Date().toISOString()
-    const { data: createdSessionData, error: createSessionError } = await supabase
+  if (orderType === 'table') {
+    const tableIdForOrder = tableId as string
+
+    const { data: table, error: tableError } = await supabase
+      .from('tables')
+      .select('id, is_active')
+      .eq('id', tableIdForOrder)
+      .maybeSingle()
+
+    if (tableError || !table) {
+      return NextResponse.json({ message: 'That table could not be found.' }, { status: 404 })
+    }
+
+    if (!table.is_active) {
+      return NextResponse.json({ message: 'That table is inactive right now.' }, { status: 400 })
+    }
+
+    const { data: existingActiveSession, error: sessionError } = await supabase
       .from('table_sessions')
-      .insert({
-        table_id: tableId,
-        guest_name: 'Guest',
-        guest_phone: null,
-        last_active_at: now
-      })
       .select('id')
-      .single()
+      .eq('table_id', tableIdForOrder)
+      .eq('status', 'active')
+      .maybeSingle()
 
-    if (createSessionError || !createdSessionData) {
-      const createSessionErrorMessage = createSessionError?.message?.toLowerCase() ?? ''
+    if (sessionError) {
+      return NextResponse.json(
+        { message: 'Could not load the current table session.' },
+        { status: 500 }
+      )
+    }
 
-      if (createSessionErrorMessage.includes('guest_phone')) {
-        return NextResponse.json(
-          {
-            message:
-              'The database still requires table_sessions.guest_phone. Apply migration 0006_make_guest_phone_nullable.sql and try again.'
-          },
-          { status: 500 }
-        )
-      }
+    activeSessionId = existingActiveSession?.id ?? null
 
-      const { data: recoveredSession, error: recoverSessionError } = await supabase
+    if (!activeSessionId) {
+      const now = new Date().toISOString()
+      const { data: createdSessionData, error: createSessionError } = await supabase
         .from('table_sessions')
+        .insert({
+          table_id: tableIdForOrder,
+          guest_name: 'Guest',
+          guest_phone: null,
+          last_active_at: now
+        })
         .select('id')
-        .eq('table_id', tableId)
-        .eq('status', 'active')
-        .maybeSingle()
+        .single()
 
-      if (recoverSessionError || !recoveredSession) {
-        return NextResponse.json(
-          { message: 'Could not start a guest session for that table.' },
-          { status: 500 }
-        )
+      if (createSessionError || !createdSessionData) {
+        const createSessionErrorMessage = createSessionError?.message?.toLowerCase() ?? ''
+
+        if (createSessionErrorMessage.includes('guest_phone')) {
+          return NextResponse.json(
+            {
+              message:
+                'The database still requires table_sessions.guest_phone. Apply migration 0006_make_guest_phone_nullable.sql and try again.'
+            },
+            { status: 500 }
+          )
+        }
+
+        const { data: recoveredSession, error: recoverSessionError } = await supabase
+          .from('table_sessions')
+          .select('id')
+          .eq('table_id', tableIdForOrder)
+          .eq('status', 'active')
+          .maybeSingle()
+
+        if (recoverSessionError || !recoveredSession) {
+          return NextResponse.json(
+            { message: 'Could not start a guest session for that table.' },
+            { status: 500 }
+          )
+        }
+
+        activeSessionId = recoveredSession.id
+      } else {
+        activeSessionId = createdSessionData.id
+        createdSession = true
       }
-
-      activeSessionId = recoveredSession.id
-    } else {
-      activeSessionId = createdSessionData.id
-      createdSession = true
     }
   }
 
@@ -157,17 +183,34 @@ export async function POST(request: Request) {
     const { data: createdOrder, error: orderError } = await supabase
       .from('orders')
       .insert({
-        session_id: activeSessionId,
-        table_id: tableId,
-        ordered_by_name: 'Admin',
-        ordered_by_phone: '',
+        session_id: orderType === 'table' ? activeSessionId : null,
+        table_id: orderType === 'table' ? tableId : null,
+        ordered_by_name: orderType === 'table' ? 'Admin' : customerName,
+        ordered_by_phone: orderType === 'table' ? '' : customerPhone,
         note,
         total_cents: totalCents
       })
-      .select('id')
+      .select(
+        'id, table_id, created_at, status, note, total_cents, session_id, ordered_by_name, ordered_by_phone'
+      )
       .single()
 
     if (orderError || !createdOrder) {
+      const orderErrorMessage = orderError?.message?.toLowerCase() ?? ''
+
+      if (
+        orderType === 'out' &&
+        (orderErrorMessage.includes('table_id') || orderErrorMessage.includes('session_id'))
+      ) {
+        return NextResponse.json(
+          {
+            message:
+              'The database still requires orders.table_id and orders.session_id. Apply migration 0007_make_orders_table_optional.sql and try again.'
+          },
+          { status: 500 }
+        )
+      }
+
       return NextResponse.json({ message: 'Could not create the order.' }, { status: 500 })
     }
 
@@ -186,6 +229,36 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    if (orderType === 'out') {
+      const receiptPayload = buildReceiptPayloadForOrders({
+        guestName: customerName,
+        orders: [
+          {
+            ...(createdOrder as Omit<AdminOrder, 'items' | 'guest_name'>),
+            guest_name: null,
+            items: normalizedOrderItems.map((item) => ({
+              item_name: item.item_name,
+              quantity: item.quantity,
+              line_total_cents: item.line_total_cents
+            }))
+          }
+        ]
+      })
+
+      const token = createReceiptToken(receiptPayload)
+      const receiptUrl = new URL('/print/receipt', request.url)
+      receiptUrl.searchParams.set('token', token)
+
+      revalidatePath('/admin/sessions')
+      revalidatePath('/api/admin/overview')
+
+      return NextResponse.json({
+        ok: true,
+        message: 'Out order created.',
+        receiptUrl: receiptUrl.toString()
+      })
+    }
   } catch {
     return NextResponse.json(
       { message: 'One or more selected items are unavailable.' },
@@ -193,21 +266,27 @@ export async function POST(request: Request) {
     )
   }
 
-  await supabase
-    .from('table_sessions')
-    .update({
-      last_active_at: new Date().toISOString()
-    })
-    .eq('id', activeSessionId)
+  if (orderType === 'table' && activeSessionId && tableId) {
+    await supabase
+      .from('table_sessions')
+      .update({
+        last_active_at: new Date().toISOString()
+      })
+      .eq('id', activeSessionId)
 
-  revalidatePath(`/table/${tableId}`)
-  revalidatePath(`/table/${tableId}/orders`)
+    revalidatePath(`/table/${tableId}`)
+    revalidatePath(`/table/${tableId}/orders`)
+    revalidatePath(`/admin/sessions/${tableId}`)
+  }
+
   revalidatePath('/admin/sessions')
-  revalidatePath(`/admin/sessions/${tableId}`)
   revalidatePath('/api/admin/overview')
 
   return NextResponse.json({
     ok: true,
-    message: createdSession ? 'Admin order created and guest session started.' : 'Admin order created.'
+    message:
+      createdSession
+          ? 'Admin order created and guest session started.'
+          : 'Admin order created.'
   })
 }

@@ -18,7 +18,7 @@ const soundReadyStorageKey = 'cafepos-admin-sound-ready'
 type Notice = {
   id: string
   kind: 'order' | 'service'
-  tableId: string
+  tableId: string | null
   title: string
   message: string
 }
@@ -35,8 +35,10 @@ function buildOrderNotice(order: AdminOrder): Notice {
     id: `order:${order.id}`,
     kind: 'order',
     tableId: order.table_id,
-    title: `${order.guest_name ?? 'Guest'} placed an order`,
-    message: `Table ${order.table_id} just placed a new order for ${toPrice(order.total_cents)}.`
+    title: `${order.ordered_by_name || order.guest_name || 'Guest'} placed an order`,
+    message: order.table_id
+      ? `Table ${order.table_id} just placed a new order for ${toPrice(order.total_cents)}.`
+      : `A new out order was placed for ${toPrice(order.total_cents)}.`
   }
 }
 
@@ -398,10 +400,10 @@ export default function AdminGlobalNotifier({
               onClick={() => {
                 stopAlertSound()
                 dismissNotice(notice.id)
-                router.push(`/admin/sessions/${notice.tableId}`)
+                router.push(notice.tableId ? `/admin/sessions/${notice.tableId}` : '/admin/sessions')
               }}
             >
-              Open table session
+              {notice.tableId ? 'Open table session' : 'Open sessions'}
             </button>
             <button
               className="button buttonSecondary"

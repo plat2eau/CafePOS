@@ -22,6 +22,8 @@ type FlashMessage = {
   message: string
 }
 
+type OrderType = 'table' | 'out'
+
 function toPrice(priceCents: number) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -61,10 +63,14 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   const [flash, setFlash] = useState<FlashMessage | null>(null)
   const [isAddOrderDialogOpen, setIsAddOrderDialogOpen] = useState(false)
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
+  const [orderType, setOrderType] = useState<OrderType>(tables.length > 0 ? 'table' : 'out')
   const [selectedTableId, setSelectedTableId] = useState(tables[0]?.id ?? '')
+  const [customerName, setCustomerName] = useState('Guest')
+  const [customerPhone, setCustomerPhone] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [note, setNote] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [pendingReceiptOrderId, setPendingReceiptOrderId] = useState<string | null>(null)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
 
@@ -90,6 +96,7 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   }, [])
 
   useEffect(() => {
+    setOrderType((current) => (current === 'table' && tables.length === 0 ? 'out' : current))
     setSelectedTableId((current) =>
       tables.some((table) => table.id === current)
         ? current
@@ -101,6 +108,10 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
     const map = new Map<string, AdminOrder[]>()
 
     for (const order of data.orders) {
+      if (!order.table_id) {
+        continue
+      }
+
       const list = map.get(order.table_id)
       if (list) {
         list.push(order)
@@ -164,8 +175,11 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   }
 
   function resetOrderComposer() {
+    setOrderType(tables.length > 0 ? 'table' : 'out')
     setSearchQuery('')
     setNote('')
+    setCustomerName('Guest')
+    setCustomerPhone('')
     setQuantities({})
     setSelectedTableId((current) =>
       tables.some((table) => table.id === current)
@@ -175,10 +189,18 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   }
 
   async function handleCreateAdminOrder() {
-    if (!selectedTableId) {
+    if (orderType === 'table' && !selectedTableId) {
       setFlash({
         tone: 'error',
         message: 'Choose a table before creating the order.'
+      })
+      return
+    }
+
+    if (orderType === 'out' && !customerName.trim()) {
+      setFlash({
+        tone: 'error',
+        message: 'Enter a customer name for the out order.'
       })
       return
     }
@@ -200,7 +222,10 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        tableId: selectedTableId,
+        orderType,
+        tableId: orderType === 'table' ? selectedTableId : undefined,
+        customerName: orderType === 'out' ? customerName : undefined,
+        customerPhone: orderType === 'out' ? customerPhone : undefined,
         note,
         items: selectedItems.map((item) => ({
           itemId: item.itemId,
@@ -223,7 +248,9 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
       return
     }
 
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null
+    const payload = (await response.json().catch(() => null)) as
+      | { message?: string; receiptUrl?: string }
+      | null
 
     if (!response.ok) {
       setFlash({
@@ -249,6 +276,48 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
       message: payload?.message ?? 'Admin order created.'
     })
     setIsSubmittingOrder(false)
+
+    if (orderType === 'out' && payload?.receiptUrl) {
+      router.push(payload.receiptUrl)
+    }
+  }
+
+  async function handleOpenOutOrderReceipt(orderId: string) {
+    setPendingReceiptOrderId(orderId)
+
+    const response = await fetch(`/api/admin/orders/${orderId}/receipt-token`, {
+      method: 'POST'
+    }).catch(() => null)
+
+    if (!response) {
+      setFlash({
+        tone: 'error',
+        message: 'Could not open the receipt right now.'
+      })
+      setPendingReceiptOrderId(null)
+      return
+    }
+
+    if (response.status === 401) {
+      router.replace('/admin/login?error=unauthorized')
+      return
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | { message?: string; receiptUrl?: string }
+      | null
+
+    if (!response.ok || !payload?.receiptUrl) {
+      setFlash({
+        tone: 'error',
+        message: payload?.message ?? 'Could not open the receipt right now.'
+      })
+      setPendingReceiptOrderId(null)
+      return
+    }
+
+    setPendingReceiptOrderId(null)
+    router.push(payload.receiptUrl)
   }
 
   return (
@@ -257,7 +326,6 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
         <button
           className="button"
           type="button"
-          disabled={tables.length === 0}
           onClick={() => {
             setFlash(null)
             setIsAddOrderDialogOpen(true)
@@ -300,7 +368,7 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
               data.orders.map((order) => (
                 <div className="adminOrderCard" key={order.id}>
                   <div className="summaryRow">
-                    <strong>Table {order.table_id}</strong>
+                    <strong>{order.table_id ? `Table ${order.table_id}` : 'Out order'}</strong>
                     <span>{formatTimestamp(order.created_at)}</span>
                   </div>
                   <p>{formatOrderIdentity(order.ordered_by_name, order.ordered_by_phone)} · {order.status}</p>
@@ -319,9 +387,30 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                     <span>Total</span>
                     <strong>{toPrice(order.total_cents)}</strong>
                   </div>
-                  <Link className="button buttonSecondary" href={`/admin/sessions/${order.table_id}`}>
-                    Manage table
-                  </Link>
+                  <div className="adminOrderActions">
+                    {order.table_id ? (
+                      <Link className="button buttonSecondary" href={`/admin/sessions/${order.table_id}`}>
+                        Manage table
+                      </Link>
+                    ) : (
+                      <button
+                        className={`button buttonSecondary${pendingReceiptOrderId === order.id ? ' buttonLoading' : ''}`}
+                        type="button"
+                        disabled={pendingReceiptOrderId !== null}
+                        aria-busy={pendingReceiptOrderId === order.id}
+                        onClick={() => void handleOpenOutOrderReceipt(order.id)}
+                      >
+                        {pendingReceiptOrderId === order.id ? (
+                          <>
+                            <span className="buttonSpinner" aria-hidden="true" />
+                            Opening receipt...
+                          </>
+                        ) : (
+                          'Print receipt'
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -381,32 +470,87 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
             <p className="eyebrow">Admin Order</p>
             <h2 id="admin-add-order-title">Add order</h2>
             <p className="finePrint">
-              Choose an active table, search menu items, and submit the order as Admin.
+              Choose whether this is a table order or an out order, then build the order.
             </p>
 
             <div className="adminOrderDialogLayout">
               <div className="sectionStack">
                 <div className="formField">
-                  <label htmlFor="admin-order-table">Table</label>
-                  <select
-                    id="admin-order-table"
-                    name="admin-order-table"
-                    value={selectedTableId}
-                    onChange={(event) => setSelectedTableId(event.target.value)}
-                  >
-                    {tables.map((table) => {
-                      const session = data.sessions.find((entry) => entry.table_id === table.id)
-
-                      return (
-                        <option key={table.id} value={table.id}>
-                          {session
-                            ? `${table.label} · ${session.guest_name}`
-                            : `${table.label} · No active session`}
-                        </option>
-                      )
-                    })}
-                  </select>
+                  <label>Order type</label>
+                  <div className="requestTypeRow">
+                    <label className="radioChoice">
+                      <input
+                        type="radio"
+                        name="admin-order-type"
+                        value="table"
+                        checked={orderType === 'table'}
+                        disabled={tables.length === 0}
+                        onChange={() => setOrderType('table')}
+                      />
+                      <span>Table order</span>
+                    </label>
+                    <label className="radioChoice">
+                      <input
+                        type="radio"
+                        name="admin-order-type"
+                        value="out"
+                        checked={orderType === 'out'}
+                        onChange={() => setOrderType('out')}
+                      />
+                      <span>Out order</span>
+                    </label>
+                  </div>
                 </div>
+
+                {orderType === 'table' ? (
+                  <div className="formField">
+                    <label htmlFor="admin-order-table">Table</label>
+                    <select
+                      id="admin-order-table"
+                      name="admin-order-table"
+                      value={selectedTableId}
+                      onChange={(event) => setSelectedTableId(event.target.value)}
+                    >
+                      {tables.map((table) => {
+                        const session = data.sessions.find((entry) => entry.table_id === table.id)
+
+                        return (
+                          <option key={table.id} value={table.id}>
+                            {session
+                              ? `${table.label} · ${session.guest_name}`
+                              : `${table.label} · No active session`}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    <div className="formField">
+                      <label htmlFor="admin-order-customer-name">Name</label>
+                      <input
+                        id="admin-order-customer-name"
+                        name="admin-order-customer-name"
+                        type="text"
+                        value={customerName}
+                        onChange={(event) => setCustomerName(event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="formField">
+                      <label htmlFor="admin-order-customer-phone">Phone number</label>
+                      <input
+                        id="admin-order-customer-phone"
+                        name="admin-order-customer-phone"
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="Optional"
+                        value={customerPhone}
+                        onChange={(event) => setCustomerPhone(event.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <SearchBar
                   value={searchQuery}
@@ -457,16 +601,24 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
               <div className="adminOrderSummaryCard">
                 <div className="dialogSummary">
                   <div className="summaryRow">
-                    <span>Table</span>
-                    <strong>{selectedTable?.label ?? 'Choose table'}</strong>
+                    <span>Order type</span>
+                    <strong>{orderType === 'table' ? 'Table order' : 'Out order'}</strong>
                   </div>
                   <div className="summaryRow">
-                    <span>Session</span>
-                    <strong>{selectedSession?.guest_name ?? 'Guest session will be created'}</strong>
+                    <span>{orderType === 'table' ? 'Table' : 'Customer'}</span>
+                    <strong>
+                      {orderType === 'table'
+                        ? selectedTable?.label ?? 'Choose table'
+                        : customerName.trim() || 'Enter name'}
+                    </strong>
                   </div>
                   <div className="summaryRow">
-                    <span>Created by</span>
-                    <strong>Admin</strong>
+                    <span>{orderType === 'table' ? 'Session' : 'Phone'}</span>
+                    <strong>
+                      {orderType === 'table'
+                        ? selectedSession?.guest_name ?? 'Guest session will be created'
+                        : customerPhone.trim() || 'Not provided'}
+                    </strong>
                   </div>
                 </div>
 
@@ -536,7 +688,11 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                   <button
                     className={`button${isSubmittingOrder ? ' buttonLoading' : ''}`}
                     type="button"
-                    disabled={isSubmittingOrder || !selectedTableId || selectedItems.length === 0}
+                    disabled={
+                      isSubmittingOrder ||
+                      selectedItems.length === 0 ||
+                      (orderType === 'table' ? !selectedTableId : !customerName.trim())
+                    }
                     aria-busy={isSubmittingOrder}
                     onClick={() => void handleCreateAdminOrder()}
                   >

@@ -469,6 +469,21 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   gap: 10px;
 }
 
+.radioChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg-strong);
+}
+
+.radioChoice input {
+  margin: 0;
+}
+
 .finePrint {
   margin: 0;
   color: var(--muted);
@@ -842,6 +857,12 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 .adminActionStack {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.adminOrderActions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 

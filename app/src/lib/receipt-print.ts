@@ -34,6 +34,12 @@ type BuildReceiptPayloadOptions = Pick<AdminTableDetailData, 'activeSession' | '
   discountPercentage?: number | null
 }
 
+type BuildReceiptPayloadForOrdersOptions = {
+  guestName: string
+  orders: AdminOrder[]
+  discountPercentage?: number | null
+}
+
 export function toReceiptPrice(priceCents: number) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -71,7 +77,21 @@ export function buildReceiptPayload({
     return null
   }
 
-  const orderedOrders = [...recentOrders].sort(
+  return buildReceiptPayloadForOrders({
+    guestName: activeSession.guest_name,
+    orders: recentOrders,
+    discountPercentage
+  })
+}
+
+export function buildReceiptPayloadForOrders({
+  guestName,
+  orders,
+  discountPercentage
+}: BuildReceiptPayloadForOrdersOptions): ReceiptPayload {
+  const normalizedGuestName = guestName.trim() || 'Guest'
+
+  const orderedOrders = [...orders].sort(
     (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
   )
 
@@ -86,7 +106,7 @@ export function buildReceiptPayload({
 
   return {
     generatedAt: new Date().toISOString(),
-    guestName: activeSession.guest_name,
+    guestName: normalizedGuestName,
     orders: orderedOrders.map((order: AdminOrder) => ({
       id: order.id,
       createdAt: order.created_at,

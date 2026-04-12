@@ -124,9 +124,9 @@ export type Database = {
           note: string | null
           ordered_by_name: string
           ordered_by_phone: string
-          session_id: string
+          session_id: string | null
           status: 'placed' | 'preparing' | 'served' | 'cancelled'
-          table_id: string
+          table_id: string | null
           total_cents: number
           updated_at: string
         }
@@ -137,9 +137,9 @@ export type Database = {
           note?: string | null
           ordered_by_name: string
           ordered_by_phone: string
-          session_id: string
+          session_id?: string | null
           status?: 'placed' | 'preparing' | 'served' | 'cancelled'
-          table_id: string
+          table_id?: string | null
           total_cents?: number
           updated_at?: string
         }
@@ -150,9 +150,9 @@ export type Database = {
           note?: string | null
           ordered_by_name?: string
           ordered_by_phone?: string
-          session_id?: string
+          session_id?: string | null
           status?: 'placed' | 'preparing' | 'served' | 'cancelled'
-          table_id?: string
+          table_id?: string | null
           total_cents?: number
           updated_at?: string
         }
