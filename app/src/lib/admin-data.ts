@@ -1,3 +1,4 @@
+import type { Database } from '@/lib/database.types'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export type AdminOrderItem = {
@@ -35,12 +36,22 @@ export type AdminSession = {
   id: string
   table_id: string
   guest_name: string
-  guest_phone: string
+  guest_phone: string | null
   last_active_at: string
   session_pin: string
   started_at?: string
   status?: 'active' | 'closed'
 }
+
+export type AdminMenuItem = Pick<
+  Database['public']['Tables']['menu_items']['Row'],
+  'id' | 'category_id' | 'name' | 'description' | 'price_cents' | 'sort_order'
+>
+
+export type AdminTableOption = Pick<
+  Database['public']['Tables']['tables']['Row'],
+  'id' | 'label' | 'is_active'
+>
 
 export type AdminOverviewData = {
   generatedAt: string
@@ -58,7 +69,7 @@ export type AdminTableDetailData = {
   activeSession: {
     id: string
     guest_name: string
-    guest_phone: string
+    guest_phone: string | null
     started_at: string
     last_active_at: string
     session_pin: string
@@ -231,4 +242,34 @@ export async function getAdminTableDetailData(tableId: string): Promise<AdminTab
       guest_name: activeSession?.guest_name ?? null
     }))
   }
+}
+
+export async function getAdminMenuItems(): Promise<AdminMenuItem[]> {
+  const supabase = createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('menu_items')
+    .select('id, category_id, name, description, price_cents, sort_order')
+    .eq('is_available', true)
+    .order('sort_order', { ascending: true })
+
+  if (error) {
+    throw new Error('Could not load menu items.')
+  }
+
+  return data ?? []
+}
+
+export async function getAdminTableOptions(): Promise<AdminTableOption[]> {
+  const supabase = createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('tables')
+    .select('id, label, is_active')
+    .eq('is_active', true)
+    .order('label', { ascending: true })
+
+  if (error) {
+    throw new Error('Could not load tables.')
+  }
+
+  return data ?? []
 }

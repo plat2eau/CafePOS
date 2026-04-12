@@ -248,7 +248,7 @@ export type Database = {
           closed_reason: string | null
           created_at: string
           guest_name: string
-          guest_phone: string
+          guest_phone: string | null
           id: string
           last_active_at: string
           session_pin: string
@@ -261,7 +261,7 @@ export type Database = {
           closed_reason?: string | null
           created_at?: string
           guest_name: string
-          guest_phone: string
+          guest_phone?: string | null
           id?: string
           last_active_at?: string
           session_pin?: string
@@ -274,7 +274,7 @@ export type Database = {
           closed_reason?: string | null
           created_at?: string
           guest_name?: string
-          guest_phone?: string
+          guest_phone?: string | null
           id?: string
           last_active_at?: string
           session_pin?: string

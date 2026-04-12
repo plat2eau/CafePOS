@@ -1,11 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
-import type { AdminOrder, AdminOverviewData } from '@/lib/admin-data'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import SearchBar from '@/components/SearchBar'
+import type {
+  AdminMenuItem,
+  AdminOrder,
+  AdminOverviewData,
+  AdminTableOption
+} from '@/lib/admin-data'
 
 type AdminConsoleProps = {
   initialData: AdminOverviewData
+  menuItems: AdminMenuItem[]
+  tables: AdminTableOption[]
+}
+
+type FlashMessage = {
+  tone: 'success' | 'error'
+  message: string
 }
 
 function toPrice(priceCents: number) {
@@ -24,27 +38,46 @@ function formatTimestamp(value: string) {
   }).format(new Date(value))
 }
 
-export default function AdminConsole({ initialData }: AdminConsoleProps) {
+function formatOrderIdentity(name: string, phone: string | null) {
+  return phone?.trim() ? `${name} (${phone})` : name
+}
+
+async function fetchOverviewData() {
+  const response = await fetch('/api/admin/overview', {
+    method: 'GET',
+    cache: 'no-store'
+  }).catch(() => null)
+
+  if (!response?.ok) {
+    return null
+  }
+
+  return (await response.json()) as AdminOverviewData
+}
+
+export default function AdminConsole({ initialData, menuItems, tables }: AdminConsoleProps) {
+  const router = useRouter()
   const [data, setData] = useState(initialData)
+  const [flash, setFlash] = useState<FlashMessage | null>(null)
+  const [isAddOrderDialogOpen, setIsAddOrderDialogOpen] = useState(false)
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
+  const [selectedTableId, setSelectedTableId] = useState(tables[0]?.id ?? '')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [note, setNote] = useState('')
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const deferredSearchQuery = useDeferredValue(searchQuery)
+  const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
 
   useEffect(() => {
     let cancelled = false
 
     async function refreshOverview() {
-      const response = await fetch('/api/admin/overview', {
-        method: 'GET',
-        cache: 'no-store'
-      })
+      const nextData = await fetchOverviewData()
 
-      if (!response.ok) {
+      if (!nextData || cancelled) {
         return
       }
 
-      const nextData = (await response.json()) as AdminOverviewData
-
-      if (cancelled) {
-        return
-      }
       setData(nextData)
     }
 
@@ -55,6 +88,14 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
       window.clearInterval(interval)
     }
   }, [])
+
+  useEffect(() => {
+    setSelectedTableId((current) =>
+      tables.some((table) => table.id === current)
+        ? current
+        : tables[0]?.id ?? ''
+    )
+  }, [tables])
 
   const ordersByTable = useMemo(() => {
     const map = new Map<string, AdminOrder[]>()
@@ -71,8 +112,163 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
     return map
   }, [data.orders])
 
+  const filteredMenuItems = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return menuItems
+    }
+
+    return menuItems.filter((item) => {
+      const haystack = `${item.name} ${item.description ?? ''}`.toLowerCase()
+      return haystack.includes(normalizedSearchQuery)
+    })
+  }, [menuItems, normalizedSearchQuery])
+
+  const selectedItems = useMemo(
+    () =>
+      menuItems
+        .map((item) => ({
+          itemId: item.id,
+          name: item.name,
+          priceCents: item.price_cents,
+          quantity: quantities[item.id] ?? 0
+        }))
+        .filter((item) => item.quantity > 0),
+    [menuItems, quantities]
+  )
+
+  const totalCents = useMemo(
+    () => selectedItems.reduce((sum, item) => sum + item.priceCents * item.quantity, 0),
+    [selectedItems]
+  )
+
+  const selectedSession = data.sessions.find((session) => session.table_id === selectedTableId) ?? null
+  const selectedTable = tables.find((table) => table.id === selectedTableId) ?? null
+  const searchSummary = normalizedSearchQuery
+    ? `${filteredMenuItems.length} matching item${filteredMenuItems.length === 1 ? '' : 's'}`
+    : `${menuItems.length} item${menuItems.length === 1 ? '' : 's'} available`
+
+  function adjustQuantity(itemId: string, delta: number) {
+    setQuantities((current) => {
+      const nextQuantity = Math.max(0, (current[itemId] ?? 0) + delta)
+
+      if (nextQuantity === 0) {
+        const { [itemId]: _removed, ...rest } = current
+        return rest
+      }
+
+      return {
+        ...current,
+        [itemId]: nextQuantity
+      }
+    })
+  }
+
+  function resetOrderComposer() {
+    setSearchQuery('')
+    setNote('')
+    setQuantities({})
+    setSelectedTableId((current) =>
+      tables.some((table) => table.id === current)
+        ? current
+        : tables[0]?.id ?? ''
+    )
+  }
+
+  async function handleCreateAdminOrder() {
+    if (!selectedTableId) {
+      setFlash({
+        tone: 'error',
+        message: 'Choose a table before creating the order.'
+      })
+      return
+    }
+
+    if (selectedItems.length === 0) {
+      setFlash({
+        tone: 'error',
+        message: 'Add at least one item to the order.'
+      })
+      return
+    }
+
+    setFlash(null)
+    setIsSubmittingOrder(true)
+
+    const response = await fetch('/api/admin/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tableId: selectedTableId,
+        note,
+        items: selectedItems.map((item) => ({
+          itemId: item.itemId,
+          quantity: item.quantity
+        }))
+      })
+    }).catch(() => null)
+
+    if (!response) {
+      setFlash({
+        tone: 'error',
+        message: 'Could not create the admin order right now.'
+      })
+      setIsSubmittingOrder(false)
+      return
+    }
+
+    if (response.status === 401) {
+      router.replace('/admin/login?error=unauthorized')
+      return
+    }
+
+    const payload = (await response.json().catch(() => null)) as { message?: string } | null
+
+    if (!response.ok) {
+      setFlash({
+        tone: 'error',
+        message: payload?.message ?? 'Could not create the admin order.'
+      })
+      setIsSubmittingOrder(false)
+      return
+    }
+
+    const nextData = await fetchOverviewData()
+
+    if (nextData) {
+      setData(nextData)
+      resetOrderComposer()
+    } else {
+      resetOrderComposer()
+    }
+
+    setIsAddOrderDialogOpen(false)
+    setFlash({
+      tone: 'success',
+      message: payload?.message ?? 'Admin order created.'
+    })
+    setIsSubmittingOrder(false)
+  }
+
   return (
     <div className="sectionStack">
+      <div className="buttonRow">
+        <button
+          className="button"
+          type="button"
+          disabled={tables.length === 0}
+          onClick={() => {
+            setFlash(null)
+            setIsAddOrderDialogOpen(true)
+          }}
+        >
+          Add order
+        </button>
+      </div>
+
+      {flash ? <p className={`statusMessage ${flash.tone}`}>{flash.message}</p> : null}
+
       <div className="compactGrid">
         <article className="card">
           <p className="eyebrow">Active tables</p>
@@ -107,9 +303,7 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
                     <strong>Table {order.table_id}</strong>
                     <span>{formatTimestamp(order.created_at)}</span>
                   </div>
-                  <p>
-                    {order.ordered_by_name} ({order.ordered_by_phone}) · {order.status}
-                  </p>
+                  <p>{formatOrderIdentity(order.ordered_by_name, order.ordered_by_phone)} · {order.status}</p>
                   <div className="stack">
                     {order.items.map((item, index) => (
                       <div className="summaryRow" key={`${order.id}-${index}`}>
@@ -151,7 +345,7 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
                       <span>{orderCount} order{orderCount === 1 ? '' : 's'}</span>
                     </div>
                     <p>{session.guest_name}</p>
-                    <p>{session.guest_phone}</p>
+                    {session.guest_phone ? <p>{session.guest_phone}</p> : null}
                     <p>
                       Session PIN <strong>{session.session_pin}</strong>
                     </p>
@@ -166,6 +360,201 @@ export default function AdminConsole({ initialData }: AdminConsoleProps) {
           </div>
         </article>
       </div>
+
+      {isAddOrderDialogOpen ? (
+        <div
+          className="dialogBackdrop"
+          role="presentation"
+          onClick={() => {
+            if (!isSubmittingOrder) {
+              setIsAddOrderDialogOpen(false)
+            }
+          }}
+        >
+          <div
+            className="dialogCard adminOrderDialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-add-order-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="eyebrow">Admin Order</p>
+            <h2 id="admin-add-order-title">Add order</h2>
+            <p className="finePrint">
+              Choose an active table, search menu items, and submit the order as Admin.
+            </p>
+
+            <div className="adminOrderDialogLayout">
+              <div className="sectionStack">
+                <div className="formField">
+                  <label htmlFor="admin-order-table">Table</label>
+                  <select
+                    id="admin-order-table"
+                    name="admin-order-table"
+                    value={selectedTableId}
+                    onChange={(event) => setSelectedTableId(event.target.value)}
+                  >
+                    {tables.map((table) => {
+                      const session = data.sessions.find((entry) => entry.table_id === table.id)
+
+                      return (
+                        <option key={table.id} value={table.id}>
+                          {session
+                            ? `${table.label} · ${session.guest_name}`
+                            : `${table.label} · No active session`}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+
+                <SearchBar
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  label="Search items"
+                  placeholder="Search by item name"
+                  summary={searchSummary}
+                />
+
+                <div className="adminMenuSearchResults">
+                  {filteredMenuItems.length === 0 ? (
+                    <p className="finePrint">No menu items match that search.</p>
+                  ) : (
+                    filteredMenuItems.map((item) => (
+                      <div className="adminMenuItemRow" key={item.id}>
+                        <div className="stack">
+                          <div className="summaryRow">
+                            <strong>{item.name}</strong>
+                            <span>{toPrice(item.price_cents)}</span>
+                          </div>
+                          {item.description ? <p>{item.description}</p> : null}
+                        </div>
+                        <div className="quantityControls">
+                          <button
+                            className="quantityButton"
+                            type="button"
+                            aria-label={`Remove one ${item.name}`}
+                            onClick={() => adjustQuantity(item.id, -1)}
+                          >
+                            −
+                          </button>
+                          <span className="quantityValue">{quantities[item.id] ?? 0}</span>
+                          <button
+                            className="quantityButton"
+                            type="button"
+                            aria-label={`Add one ${item.name}`}
+                            onClick={() => adjustQuantity(item.id, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="adminOrderSummaryCard">
+                <div className="dialogSummary">
+                  <div className="summaryRow">
+                    <span>Table</span>
+                    <strong>{selectedTable?.label ?? 'Choose table'}</strong>
+                  </div>
+                  <div className="summaryRow">
+                    <span>Session</span>
+                    <strong>{selectedSession?.guest_name ?? 'Guest session will be created'}</strong>
+                  </div>
+                  <div className="summaryRow">
+                    <span>Created by</span>
+                    <strong>Admin</strong>
+                  </div>
+                </div>
+
+                <div className="adminOrderSummaryList">
+                  {selectedItems.length === 0 ? (
+                    <p className="finePrint">Select menu items to build the order.</p>
+                  ) : (
+                    selectedItems.map((item) => (
+                      <div className="adminOrderSummaryItem" key={item.itemId}>
+                        <div className="stack">
+                          <div className="summaryRow">
+                            <strong>{item.name}</strong>
+                            <span>{toPrice(item.priceCents * item.quantity)}</span>
+                          </div>
+                          <p className="finePrint">{toPrice(item.priceCents)} each</p>
+                        </div>
+                        <div className="quantityControls">
+                          <button
+                            className="quantityButton"
+                            type="button"
+                            aria-label={`Reduce ${item.name}`}
+                            onClick={() => adjustQuantity(item.itemId, -1)}
+                          >
+                            −
+                          </button>
+                          <span className="quantityValue">{item.quantity}</span>
+                          <button
+                            className="quantityButton"
+                            type="button"
+                            aria-label={`Increase ${item.name}`}
+                            onClick={() => adjustQuantity(item.itemId, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="formField">
+                  <label htmlFor="admin-order-note">Note</label>
+                  <textarea
+                    id="admin-order-note"
+                    name="admin-order-note"
+                    rows={3}
+                    placeholder="Optional order note"
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                  />
+                </div>
+
+                <div className="summaryRow total">
+                  <span>Total</span>
+                  <strong>{toPrice(totalCents)}</strong>
+                </div>
+
+                <div className="dialogActions">
+                  <button
+                    className="button buttonSecondary"
+                    type="button"
+                    disabled={isSubmittingOrder}
+                    onClick={() => setIsAddOrderDialogOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={`button${isSubmittingOrder ? ' buttonLoading' : ''}`}
+                    type="button"
+                    disabled={isSubmittingOrder || !selectedTableId || selectedItems.length === 0}
+                    aria-busy={isSubmittingOrder}
+                    onClick={() => void handleCreateAdminOrder()}
+                  >
+                    {isSubmittingOrder ? (
+                      <>
+                        <span className="buttonSpinner" aria-hidden="true" />
+                        Creating order...
+                      </>
+                    ) : (
+                      'Create order'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

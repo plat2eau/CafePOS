@@ -21,6 +21,10 @@ function toPrice(priceCents: number) {
   }).format(priceCents / 100)
 }
 
+function formatOrderIdentity(name: string, phone: string | null) {
+  return phone?.trim() ? `${name} (${phone})` : name
+}
+
 export default async function TableOrdersPage({ params, searchParams }: TableOrdersPageProps) {
   const { tableId } = await params
   const { placed } = await searchParams
@@ -99,7 +103,7 @@ export default async function TableOrdersPage({ params, searchParams }: TableOrd
                   <span>{order.status}</span>
                 </div>
                 <p>
-                  Placed by {order.ordered_by_name} ({order.ordered_by_phone})
+                  Placed by {formatOrderIdentity(order.ordered_by_name, order.ordered_by_phone)}
                 </p>
                 <div className="stack">
                   {(order.order_items ?? []).map((item, index) => (

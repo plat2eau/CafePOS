@@ -101,6 +101,17 @@ main {
   gap: clamp(20px, 3vw, 28px);
 }
 
+.adminSessionsShell {
+  position: relative;
+}
+
+.adminSessionsTopAction {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
+}
+
 .heroHeader {
   display: flex;
   flex-direction: column;
@@ -419,7 +430,8 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 }
 
 .formField textarea,
-.formField input {
+.formField input,
+.formField select {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--border);
@@ -431,6 +443,11 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 }
 
 .formField input:focus {
+  outline: 2px solid var(--focus-ring);
+  border-color: var(--accent);
+}
+
+.formField select:focus {
   outline: 2px solid var(--focus-ring);
   border-color: var(--accent);
 }
@@ -867,6 +884,48 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
 .dialogCard h2 {
   margin: 0;
+}
+
+.adminOrderDialog {
+  width: min(1080px, 100%);
+}
+
+.adminOrderDialogLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+  gap: 20px;
+  margin-top: 18px;
+}
+
+.adminMenuSearchResults,
+.adminOrderSummaryList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.adminMenuSearchResults {
+  padding-right: 4px;
+}
+
+.adminMenuItemRow,
+.adminOrderSummaryItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
+}
+
+.adminOrderSummaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .dialogSummary {
@@ -1321,6 +1380,19 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   }
 }
 
+
+@media (max-width: 899px) {
+  .adminOrderDialogLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 639px) {
+  .adminSessionsTopAction {
+    position: static;
+    align-self: flex-end;
+  }
+}
 
 @media (min-width: 900px) {
   .menuSearchBarWrap {

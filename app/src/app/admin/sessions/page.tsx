@@ -3,16 +3,23 @@ import AdminSessionHeartbeat from '@/components/AdminSessionHeartbeat'
 import AdminLogoutButton from '@/components/AdminLogoutButton'
 import AdminConsole from '@/components/AdminConsole'
 import { requireAdminAuth } from '@/lib/admin-auth'
-import { getAdminOverviewData } from '@/lib/admin-data'
+import { getAdminMenuItems, getAdminOverviewData, getAdminTableOptions } from '@/lib/admin-data'
 
 export default async function AdminSessionsPage() {
-  const auth = await requireAdminAuth()
-  const initialData = await getAdminOverviewData()
+  const [auth, initialData, menuItems, tables] = await Promise.all([
+    requireAdminAuth(),
+    getAdminOverviewData(),
+    getAdminMenuItems(),
+    getAdminTableOptions()
+  ])
 
   return (
     <main>
-      <section className="hero heroShell">
+      <section className="hero heroShell adminSessionsShell">
         <AdminSessionHeartbeat />
+        <div className="adminSessionsTopAction">
+          <AdminLogoutButton />
+        </div>
         <div className="heroHeader compact">
           <Link className="backLink" href="/admin/login">
             ← Back to login
@@ -29,11 +36,7 @@ export default async function AdminSessionsPage() {
           </div>
         </div>
 
-        <div className="buttonRow">
-          <AdminLogoutButton />
-        </div>
-
-        <AdminConsole initialData={initialData} />
+        <AdminConsole initialData={initialData} menuItems={menuItems} tables={tables} />
       </section>
     </main>
   )

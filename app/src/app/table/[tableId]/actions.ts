@@ -265,7 +265,7 @@ export async function placeOrderForTable(
   }
 
   const orderIdentity =
-    storedIdentity ?? getValidatedOrderIdentity(session.guest_name, session.guest_phone)
+    storedIdentity ?? getValidatedOrderIdentity(session.guest_name, session.guest_phone ?? '')
 
   if (!orderIdentity) {
     return {

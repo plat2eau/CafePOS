@@ -39,6 +39,10 @@ function formatTimestamp(value: string) {
   }).format(new Date(value))
 }
 
+function formatOrderIdentity(name: string, phone: string | null) {
+  return phone?.trim() ? `${name} (${phone})` : name
+}
+
 export default function AdminTableDetailClient({
   tableId,
   signedInLabel,
@@ -359,7 +363,7 @@ export default function AdminTableDetailClient({
                     <p>
                       <strong>{activeSession.guest_name}</strong>
                     </p>
-                    <p>{activeSession.guest_phone}</p>
+                    {activeSession.guest_phone ? <p>{activeSession.guest_phone}</p> : null}
                     <p>
                       Session PIN <strong>{activeSession.session_pin}</strong>
                     </p>
@@ -435,7 +439,7 @@ export default function AdminTableDetailClient({
                       <span>{formatTimestamp(order.created_at)}</span>
                     </div>
                     <p>
-                      {order.ordered_by_name} ({order.ordered_by_phone}) · <span className="statusChip">{order.status}</span>
+                      {formatOrderIdentity(order.ordered_by_name, order.ordered_by_phone)} · <span className="statusChip">{order.status}</span>
                     </p>
                     <div className="stack">
                       {order.items.map((item, index) => (

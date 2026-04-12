@@ -164,7 +164,7 @@ export default async function TablePage({ params }: TablePageProps) {
             <GuestSessionForm
               action={sessionAction}
               initialName={isCurrentGuestSession ? activeSession?.guest_name : ''}
-              initialPhone={isCurrentGuestSession ? activeSession?.guest_phone : ''}
+              initialPhone={isCurrentGuestSession ? (activeSession?.guest_phone ?? '') : ''}
               requirePin={Boolean(activeSession && !isCurrentGuestSession)}
             />
           </article>
