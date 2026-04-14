@@ -115,7 +115,10 @@ export function buildReceiptPayloadForOrders({
       createdAt: order.created_at,
       totalCents: order.total_cents,
       note: order.note,
-      items: order.items.map((item) => ({
+      items: [
+        ...order.items.filter((item) => Boolean(item.menu_item_id)),
+        ...order.items.filter((item) => !item.menu_item_id)
+      ].map((item) => ({
         name: item.item_name,
         quantity: item.quantity,
         lineTotalCents: item.line_total_cents

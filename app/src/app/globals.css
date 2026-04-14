@@ -668,6 +668,17 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   gap: 16px;
 }
 
+.adminCustomItemRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 140px) minmax(0, 100px);
+  gap: 10px;
+  align-items: center;
+}
+
+.adminCustomItemAdd {
+  width: 100%;
+}
+
 .dialogSummary {
   margin-top: 16px;
   padding: 16px;

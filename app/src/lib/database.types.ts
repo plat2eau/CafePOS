@@ -74,7 +74,7 @@ export type Database = {
           id: string
           item_name: string
           line_total_cents: number
-          menu_item_id: string
+          menu_item_id: string | null
           order_id: string
           quantity: number
           unit_price_cents: number
@@ -84,7 +84,7 @@ export type Database = {
           id?: string
           item_name: string
           line_total_cents: number
-          menu_item_id: string
+          menu_item_id: string | null
           order_id: string
           quantity: number
           unit_price_cents: number
@@ -94,7 +94,7 @@ export type Database = {
           id?: string
           item_name?: string
           line_total_cents?: number
-          menu_item_id?: string
+          menu_item_id?: string | null
           order_id?: string
           quantity?: number
           unit_price_cents?: number

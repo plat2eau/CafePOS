@@ -49,11 +49,36 @@ type OrderStatus = Database['public']['Tables']['orders']['Row']['status']
 
 const orderStatuses: OrderStatus[] = ['placed', 'preparing', 'served', 'cancelled']
 
+type CustomOrderItemDraft = {
+  id: string
+  name: string
+  unitPriceCents: number
+  quantity: number
+}
+
 function toPrice(priceCents: number) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR'
   }).format(priceCents / 100)
+}
+
+function parsePriceToCents(value: string) {
+  const normalized = value.trim().replace(/,/g, '')
+  if (!normalized) return null
+
+  const numberValue = Number.parseFloat(normalized)
+  if (!Number.isFinite(numberValue) || numberValue < 0) return null
+
+  return Math.round(numberValue * 100)
+}
+
+function createLocalId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `custom-${Math.random().toString(16).slice(2)}-${Date.now()}`
 }
 
 function formatTimestamp(value: string) {
@@ -97,12 +122,16 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   const [searchQuery, setSearchQuery] = useState('')
   const [note, setNote] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [customItems, setCustomItems] = useState<CustomOrderItemDraft[]>([])
+  const [customItemName, setCustomItemName] = useState('')
+  const [customItemPrice, setCustomItemPrice] = useState('')
   const [pendingStatusKey, setPendingStatusKey] = useState<string | null>(null)
   const [clearTargetTableId, setClearTargetTableId] = useState<string | null>(null)
   const [isClearingTable, setIsClearingTable] = useState(false)
   const [isOpeningReceipt, setIsOpeningReceipt] = useState(false)
   const [discountPercentage, setDiscountPercentage] = useState('')
   const [pendingReceiptOrderId, setPendingReceiptOrderId] = useState<string | null>(null)
+  const [pendingCloseOutOrderId, setPendingCloseOutOrderId] = useState<string | null>(null)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
 
@@ -210,10 +239,32 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
     [menuItems, quantities]
   )
 
-  const totalCents = useMemo(
-    () => selectedItems.reduce((sum, item) => sum + item.priceCents * item.quantity, 0),
-    [selectedItems]
+  const normalizedCustomItems = useMemo(
+    () =>
+      customItems
+        .map((item) => ({
+          ...item,
+          name: item.name.trim()
+        }))
+        .filter(
+          (item) =>
+            item.name &&
+            Number.isInteger(item.unitPriceCents) &&
+            item.unitPriceCents > 0 &&
+            Number.isInteger(item.quantity) &&
+            item.quantity > 0
+        ),
+    [customItems]
   )
+
+  const totalCents = useMemo(
+    () =>
+      selectedItems.reduce((sum, item) => sum + item.priceCents * item.quantity, 0) +
+      normalizedCustomItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0),
+    [normalizedCustomItems, selectedItems]
+  )
+
+  const hasAnyOrderItems = selectedItems.length > 0 || normalizedCustomItems.length > 0
 
   const selectedSession = data.sessions.find((session) => session.table_id === selectedTableId) ?? null
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? null
@@ -247,11 +298,55 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
     setCustomerName('Guest')
     setCustomerPhone('')
     setQuantities({})
+    setCustomItems([])
+    setCustomItemName('')
+    setCustomItemPrice('')
     setSelectedTableId((current) =>
       tables.some((table) => table.id === current)
         ? current
         : tables[0]?.id ?? ''
     )
+  }
+
+  function handleAddCustomItem() {
+    const name = customItemName.trim()
+    const unitPriceCents = parsePriceToCents(customItemPrice)
+
+    if (!name) {
+      setFlash({ tone: 'error', message: 'Enter a custom item name.' })
+      return
+    }
+
+    if (unitPriceCents === null || unitPriceCents <= 0) {
+      setFlash({ tone: 'error', message: 'Enter a valid custom item price.' })
+      return
+    }
+
+    setCustomItems((current) => [
+      ...current,
+      {
+        id: createLocalId(),
+        name,
+        unitPriceCents,
+        quantity: 1
+      }
+    ])
+    setCustomItemName('')
+    setCustomItemPrice('')
+  }
+
+  function adjustCustomItemQuantity(customItemId: string, delta: number) {
+    setCustomItems((current) => {
+      const next = current
+        .map((item) =>
+          item.id === customItemId
+            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+
+      return next
+    })
   }
 
   async function handleCreateAdminOrder() {
@@ -271,7 +366,7 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
       return
     }
 
-    if (selectedItems.length === 0) {
+    if (!hasAnyOrderItems) {
       setFlash({
         tone: 'error',
         message: 'Add at least one item to the order.'
@@ -295,6 +390,11 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
         note,
         items: selectedItems.map((item) => ({
           itemId: item.itemId,
+          quantity: item.quantity
+        })),
+        customItems: normalizedCustomItems.map((item) => ({
+          name: item.name,
+          unitPriceCents: item.unitPriceCents,
           quantity: item.quantity
         }))
       })
@@ -384,6 +484,51 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
 
     setPendingReceiptOrderId(null)
     router.push(payload.receiptUrl)
+  }
+
+  async function handleCloseOutOutOrder(orderId: string) {
+    setFlash(null)
+    setPendingCloseOutOrderId(orderId)
+
+    const response = await fetch(`/api/admin/orders/${orderId}/close-out`, {
+      method: 'POST'
+    }).catch(() => null)
+
+    if (!response) {
+      setFlash({
+        tone: 'error',
+        message: 'Could not close out the order right now.'
+      })
+      setPendingCloseOutOrderId(null)
+      return
+    }
+
+    if (response.status === 401) {
+      router.replace('/admin/login?error=unauthorized')
+      return
+    }
+
+    const payload = (await response.json().catch(() => null)) as { message?: string } | null
+
+    if (!response.ok) {
+      setFlash({
+        tone: 'error',
+        message: payload?.message ?? 'Could not close out the order.'
+      })
+      setPendingCloseOutOrderId(null)
+      return
+    }
+
+    const nextData = await fetchOverviewData()
+    if (nextData) {
+      setData(nextData)
+    }
+
+    setFlash({
+      tone: 'success',
+      message: payload?.message ?? 'Order closed out.'
+    })
+    setPendingCloseOutOrderId(null)
   }
 
   async function handleOrderStatusChange(
@@ -683,20 +828,35 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                     <ActionGroup>
                       {!order.table_id ? (
                         <>
-                        <LoadingButton
-                          variant="secondary"
-                          size="form"
-                          className="md:w-auto"
-                          type="button"
-                          loading={pendingReceiptOrderId === order.id}
-                          loadingLabel="Opening receipt..."
-                          disabled={pendingReceiptOrderId !== null}
-                          onClick={() => void handleOpenOutOrderReceipt(order.id)}
-                        >
-                          Print receipt
+                          <LoadingButton
+                            variant="secondary"
+                            size="form"
+                            className="md:w-auto"
+                            type="button"
+                            loading={pendingReceiptOrderId === order.id}
+                            loadingLabel="Opening receipt..."
+                            disabled={pendingReceiptOrderId !== null || pendingCloseOutOrderId !== null}
+                            onClick={() => void handleOpenOutOrderReceipt(order.id)}
+                          >
+                            Print receipt
+                          </LoadingButton>
+
+                          <LoadingButton
+                            variant="default"
+                            size="form"
+                            className="md:w-auto"
+                            type="button"
+                            loading={pendingCloseOutOrderId === order.id}
+                            loadingLabel="Closing out..."
+                            disabled={pendingReceiptOrderId !== null || pendingCloseOutOrderId !== null}
+                            onClick={() => void handleCloseOutOutOrder(order.id)}
+                          >
+                            Close out
                           </LoadingButton>
                         </>
-                      ) : ""}
+                      ) : (
+                        ''
+                      )}
                     </ActionGroup>
                   }
                 />
@@ -1137,10 +1297,11 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
               </div>
 
               <div className="adminOrderSummaryList">
-                {selectedItems.length === 0 ? (
-                  <p className="finePrint">Select menu items to build the order.</p>
-                ) : (
-                  selectedItems.map((item) => (
+                {!hasAnyOrderItems ? (
+                  <p className="finePrint">Select menu items or add a custom item to build the order.</p>
+                ) : null}
+
+                {selectedItems.map((item) => (
                     <div className="adminOrderSummaryItem" key={item.itemId}>
                       <div className="stack">
                         <SummaryRow>
@@ -1157,8 +1318,63 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                         onIncrement={() => adjustQuantity(item.itemId, 1)}
                       />
                     </div>
-                  ))
-                )}
+                  ))}
+
+                {normalizedCustomItems.length > 0
+                  ? normalizedCustomItems.map((item) => (
+                      <div className="adminOrderSummaryItem" key={item.id}>
+                        <div className="stack">
+                          <SummaryRow>
+                            <strong>{item.name}</strong>
+                            <span>{toPrice(item.unitPriceCents * item.quantity)}</span>
+                          </SummaryRow>
+                          <p className="finePrint">{toPrice(item.unitPriceCents)} each</p>
+                        </div>
+                        <QuantityStepper
+                          value={item.quantity}
+                          decrementLabel={`Reduce ${item.name}`}
+                          incrementLabel={`Increase ${item.name}`}
+                          onDecrement={() => adjustCustomItemQuantity(item.id, -1)}
+                          onIncrement={() => adjustCustomItemQuantity(item.id, 1)}
+                        />
+                      </div>
+                    ))
+                  : null}
+              </div>
+
+              <div className="formField">
+                <label htmlFor="admin-order-custom-item-name">Custom item</label>
+                <div className="adminCustomItemRow">
+                  <Input
+                    id="admin-order-custom-item-name"
+                    name="admin-order-custom-item-name"
+                    type="text"
+                    placeholder="Item name"
+                    value={customItemName}
+                    onChange={(event) => setCustomItemName(event.target.value)}
+                  />
+                  <Input
+                    id="admin-order-custom-item-price"
+                    name="admin-order-custom-item-price"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    placeholder="Price"
+                    value={customItemPrice}
+                    onChange={(event) => setCustomItemPrice(event.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="adminCustomItemAdd"
+                    disabled={isSubmittingOrder}
+                    onClick={() => handleAddCustomItem()}
+                  >
+                    Add
+                  </Button>
+                </div>
+                <p className="finePrint">Adds a one-off line item to this order (not saved to the menu).</p>
               </div>
 
               <div className="formField">
@@ -1191,7 +1407,7 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                   loadingLabel="Creating order..."
                   disabled={
                     isSubmittingOrder ||
-                    selectedItems.length === 0 ||
+                    !hasAnyOrderItems ||
                     (orderType === 'table' ? !selectedTableId : !customerName.trim())
                   }
                   onClick={() => void handleCreateAdminOrder()}

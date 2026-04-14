@@ -11,6 +11,12 @@ type RequestedOrderItem = {
   quantity?: number
 }
 
+type RequestedCustomItem = {
+  name?: string
+  unitPriceCents?: number
+  quantity?: number
+}
+
 function normalizePhone(value: string) {
   return value.trim()
 }
@@ -29,6 +35,7 @@ export async function POST(request: Request) {
         customerName?: string
         customerPhone?: string
         items?: RequestedOrderItem[]
+        customItems?: RequestedCustomItem[]
         note?: string
       }
     | null
@@ -46,6 +53,22 @@ export async function POST(request: Request) {
         }))
         .filter((item) => item.itemId && Number.isInteger(item.quantity) && item.quantity > 0)
     : []
+  const requestedCustomItems = Array.isArray(body?.customItems)
+    ? body.customItems
+        .map((item) => ({
+          name: String(item?.name ?? '').trim(),
+          unitPriceCents: Number(item?.unitPriceCents ?? 0),
+          quantity: Number(item?.quantity ?? 0)
+        }))
+        .filter(
+          (item) =>
+            item.name &&
+            Number.isInteger(item.unitPriceCents) &&
+            item.unitPriceCents > 0 &&
+            Number.isInteger(item.quantity) &&
+            item.quantity > 0
+        )
+    : []
 
   if (orderType === 'table' && !tableId) {
     return NextResponse.json({ message: 'Choose a table first.' }, { status: 400 })
@@ -55,7 +78,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Enter a customer name for the out order.' }, { status: 400 })
   }
 
-  if (requestedItems.length === 0) {
+  if (requestedItems.length === 0 && requestedCustomItems.length === 0) {
     return NextResponse.json({ message: 'Add at least one item to the order.' }, { status: 400 })
   }
 
@@ -144,24 +167,39 @@ export async function POST(request: Request) {
     }
   }
 
-  const uniqueItemIds = Array.from(new Set(requestedItems.map((item) => item.itemId)))
-  const { data: menuItems, error: menuItemsError } = await supabase
-    .from('menu_items')
-    .select('id, name, price_cents, is_available')
-    .in('id', uniqueItemIds)
-
-  if (menuItemsError || !menuItems) {
-    return NextResponse.json(
-      { message: 'Could not validate the selected menu items.' },
-      { status: 500 }
-    )
-  }
-
-  const menuItemMap = new Map(menuItems.map((item) => [item.id, item]))
   let totalCents = 0
 
   try {
-    const normalizedOrderItems = requestedItems.map((requestedItem) => {
+    const normalizedOrderItems: Array<{
+      menu_item_id: string | null
+      item_name: string
+      unit_price_cents: number
+      quantity: number
+      line_total_cents: number
+    }> = []
+
+    const uniqueItemIds = Array.from(new Set(requestedItems.map((item) => item.itemId)))
+    const menuItemMap = new Map<string, { id: string; name: string; price_cents: number; is_available: boolean }>()
+
+    if (uniqueItemIds.length > 0) {
+      const { data: menuItems, error: menuItemsError } = await supabase
+        .from('menu_items')
+        .select('id, name, price_cents, is_available')
+        .in('id', uniqueItemIds)
+
+      if (menuItemsError || !menuItems) {
+        return NextResponse.json(
+          { message: 'Could not validate the selected menu items.' },
+          { status: 500 }
+        )
+      }
+
+      for (const item of menuItems) {
+        menuItemMap.set(item.id, item)
+      }
+    }
+
+    for (const requestedItem of requestedItems) {
       const menuItem = menuItemMap.get(requestedItem.itemId)
 
       if (!menuItem || !menuItem.is_available) {
@@ -171,14 +209,27 @@ export async function POST(request: Request) {
       const lineTotalCents = menuItem.price_cents * requestedItem.quantity
       totalCents += lineTotalCents
 
-      return {
+      normalizedOrderItems.push({
         menu_item_id: menuItem.id,
         item_name: menuItem.name,
         unit_price_cents: menuItem.price_cents,
         quantity: requestedItem.quantity,
         line_total_cents: lineTotalCents
-      }
-    })
+      })
+    }
+
+    for (const customItem of requestedCustomItems) {
+      const lineTotalCents = customItem.unitPriceCents * customItem.quantity
+      totalCents += lineTotalCents
+
+      normalizedOrderItems.push({
+        menu_item_id: null,
+        item_name: customItem.name,
+        unit_price_cents: customItem.unitPriceCents,
+        quantity: customItem.quantity,
+        line_total_cents: lineTotalCents
+      })
+    }
 
     const { data: createdOrder, error: orderError } = await supabase
       .from('orders')
@@ -238,6 +289,7 @@ export async function POST(request: Request) {
             ...(createdOrder as Omit<AdminOrder, 'items' | 'guest_name'>),
             guest_name: null,
             items: normalizedOrderItems.map((item) => ({
+              menu_item_id: item.menu_item_id,
               item_name: item.item_name,
               quantity: item.quantity,
               line_total_cents: item.line_total_cents

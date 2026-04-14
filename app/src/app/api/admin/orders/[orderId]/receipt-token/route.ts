@@ -35,7 +35,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { data: orderItems, error: orderItemsError } = await supabase
     .from('order_items')
-    .select('item_name, quantity, line_total_cents')
+    .select('menu_item_id, item_name, quantity, line_total_cents')
     .eq('order_id', orderId)
 
   if (orderItemsError) {
