@@ -2,9 +2,12 @@ import type { Database } from '@/lib/database.types'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export type AdminOrderItem = {
+  id: string
   menu_item_id: string | null
   item_name: string
+  portion: 'half' | 'full' | null
   quantity: number
+  unit_price_cents: number
   line_total_cents: number
 }
 
@@ -105,7 +108,7 @@ async function fetchOrdersWithItems(options?: {
     orderIds.length > 0
       ? supabase
           .from('order_items')
-          .select('order_id, menu_item_id, item_name, quantity, line_total_cents')
+          .select('id, order_id, menu_item_id, item_name, portion, quantity, unit_price_cents, line_total_cents')
           .in('order_id', orderIds)
       : Promise.resolve({ data: [], error: null }),
     sessionIds.length > 0

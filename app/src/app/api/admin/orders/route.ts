@@ -325,10 +325,13 @@ export async function POST(request: Request) {
           {
             ...(createdOrder as Omit<AdminOrder, 'items' | 'guest_name'>),
             guest_name: null,
-            items: normalizedOrderItems.map((item) => ({
+            items: normalizedOrderItems.map((item, index) => ({
+              id: `preview-${index}`,
               menu_item_id: item.menu_item_id,
               item_name: item.item_name,
+              portion: item.portion,
               quantity: item.quantity,
+              unit_price_cents: item.unit_price_cents,
               line_total_cents: item.line_total_cents
             }))
           }

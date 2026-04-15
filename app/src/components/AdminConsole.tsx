@@ -46,6 +46,7 @@ type FlashState = {
 
 type OrderType = 'table' | 'out'
 type OrderStatus = Database['public']['Tables']['orders']['Row']['status']
+type OrderItemMutationAction = 'decrement' | 'remove'
 
 const orderStatuses: OrderStatus[] = ['placed', 'preparing', 'served', 'cancelled']
 
@@ -56,6 +57,13 @@ type CustomOrderItemDraft = {
   name: string
   unitPriceCents: number
   quantity: number
+}
+
+type RemoveOrderItemTarget = {
+  orderId: string
+  itemId: string
+  itemName: string
+  cancelsOrder: boolean
 }
 
 function buildQuantityKey(itemId: string, portion?: Portion | null) {
@@ -142,6 +150,8 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   const [discountPercentage, setDiscountPercentage] = useState('')
   const [pendingReceiptOrderId, setPendingReceiptOrderId] = useState<string | null>(null)
   const [pendingCloseOutOrderId, setPendingCloseOutOrderId] = useState<string | null>(null)
+  const [pendingOrderItemIds, setPendingOrderItemIds] = useState<string[]>([])
+  const [removeOrderItemTarget, setRemoveOrderItemTarget] = useState<RemoveOrderItemTarget | null>(null)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
 
@@ -328,6 +338,9 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   const searchSummary = normalizedSearchQuery
     ? `${filteredMenuItems.length} matching item${filteredMenuItems.length === 1 ? '' : 's'}`
     : `${menuItems.length} item${menuItems.length === 1 ? '' : 's'} available`
+  const isRemovingOrderItem = removeOrderItemTarget
+    ? pendingOrderItemIds.includes(removeOrderItemTarget.itemId)
+    : false
 
   function adjustQuantity(itemId: string, delta: number, portion?: Portion | null) {
     setQuantities((current) => {
@@ -401,6 +414,27 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
         .filter((item) => item.quantity > 0)
 
       return next
+    })
+  }
+
+  async function refreshAdminOverviewState() {
+    const nextData = await fetchOverviewData()
+
+    if (nextData) {
+      setData(nextData)
+      return
+    }
+
+    router.refresh()
+  }
+
+  function setOrderItemPending(itemId: string, isPending: boolean) {
+    setPendingOrderItemIds((current) => {
+      if (isPending) {
+        return current.includes(itemId) ? current : [...current, itemId]
+      }
+
+      return current.filter((currentItemId) => currentItemId !== itemId)
     })
   }
 
@@ -483,14 +517,8 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
       return
     }
 
-    const nextData = await fetchOverviewData()
-
-    if (nextData) {
-      setData(nextData)
-      resetOrderComposer()
-    } else {
-      resetOrderComposer()
-    }
+    await refreshAdminOverviewState()
+    resetOrderComposer()
 
     setIsAddOrderDialogOpen(false)
     setFlash({
@@ -648,6 +676,119 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
       message: payload?.message ?? 'Order status updated.'
     })
     setPendingStatusKey(null)
+  }
+
+  async function mutateOrderItem(
+    orderId: string,
+    itemId: string,
+    action: OrderItemMutationAction
+  ) {
+    setFlash(null)
+    setOrderItemPending(itemId, true)
+
+    const response = await fetch(`/api/admin/orders/${orderId}/items/${itemId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ action })
+    }).catch(() => null)
+
+    if (!response) {
+      setFlash({
+        tone: 'error',
+        message:
+          action === 'decrement'
+            ? 'Could not update the order item.'
+            : 'Could not remove the order item.'
+      })
+      setOrderItemPending(itemId, false)
+      return false
+    }
+
+    if (response.status === 401) {
+      setOrderItemPending(itemId, false)
+      router.replace('/admin/login?error=unauthorized')
+      return false
+    }
+
+    const payload = (await response.json().catch(() => null)) as { message?: string } | null
+
+    if (!response.ok) {
+      setFlash({
+        tone: 'error',
+        message:
+          payload?.message ??
+          (action === 'decrement'
+            ? 'Could not update the order item.'
+            : 'Could not remove the order item.')
+      })
+      setOrderItemPending(itemId, false)
+      return false
+    }
+
+    await refreshAdminOverviewState()
+    setFlash({
+      tone: 'success',
+      message:
+        payload?.message ??
+        (action === 'decrement' ? 'Order item quantity updated.' : 'Order item removed.')
+    })
+    setOrderItemPending(itemId, false)
+    return true
+  }
+
+  async function handleDecrementOrderItem(orderId: string, itemId: string) {
+    await mutateOrderItem(orderId, itemId, 'decrement')
+  }
+
+  async function handleConfirmRemoveOrderItem() {
+    if (!removeOrderItemTarget) {
+      return
+    }
+
+    const { orderId, itemId } = removeOrderItemTarget
+    const didRemove = await mutateOrderItem(orderId, itemId, 'remove')
+
+    if (didRemove) {
+      setRemoveOrderItemTarget(null)
+    }
+  }
+
+  function renderOrderItemActions(order: AdminOrder, item: AdminOrder['items'][number]) {
+    const isPending = pendingOrderItemIds.includes(item.id)
+
+    return (
+      <>
+        <LoadingButton
+          variant="secondary"
+          size="sm"
+          type="button"
+          loading={isPending}
+          loadingLabel="-1"
+          disabled={isPending}
+          onClick={() => void handleDecrementOrderItem(order.id, item.id)}
+        >
+          -1
+        </LoadingButton>
+        <Button
+          variant="secondary"
+          size="sm"
+          type="button"
+          disabled={isPending}
+          onClick={() =>
+            setRemoveOrderItemTarget({
+              orderId: order.id,
+              itemId: item.id,
+              itemName: item.item_name,
+              cancelsOrder: order.items.length === 1
+            })
+          }
+        >
+          Remove
+        </Button>
+      </>
+    )
   }
 
   async function handleClearTable() {
@@ -873,10 +1014,11 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                     </p>
                   }
                   items={order.items.map((item, index) => ({
-                    id: `${order.id}-${index}`,
+                    id: item.id ?? `${order.id}-${index}`,
                     name: item.item_name,
                     quantity: item.quantity,
-                    total: toPrice(item.line_total_cents)
+                    total: toPrice(item.line_total_cents),
+                    actions: renderOrderItemActions(order, item)
                   }))}
                   note={order.note}
                   total={toPrice(order.total_cents)}
@@ -1039,10 +1181,11 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                                   </p>
                                 }
                                 items={order.items.map((item, index) => ({
-                                  id: `${order.id}-${index}`,
+                                  id: item.id ?? `${order.id}-${index}`,
                                   name: item.item_name,
                                   quantity: item.quantity,
-                                  total: toPrice(item.line_total_cents)
+                                  total: toPrice(item.line_total_cents),
+                                  actions: renderOrderItemActions(order, item)
                                 }))}
                                 note={order.note}
                                 total={toPrice(order.total_cents)}
@@ -1088,6 +1231,60 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
           </div>
         </SectionCard>
       </div>
+
+      <Dialog
+        open={Boolean(removeOrderItemTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isRemovingOrderItem) {
+            setRemoveOrderItemTarget(null)
+          }
+        }}
+      >
+        <DialogContent
+          aria-labelledby="admin-remove-order-item-title"
+          onEscapeKeyDown={(event) => {
+            if (isRemovingOrderItem) {
+              event.preventDefault()
+            }
+          }}
+          onInteractOutside={(event) => {
+            if (isRemovingOrderItem) {
+              event.preventDefault()
+            }
+          }}
+        >
+          {removeOrderItemTarget ? (
+            <>
+              <DialogHeader>
+                <p className="eyebrow">Edit order</p>
+                <DialogTitle id="admin-remove-order-item-title">Remove this item?</DialogTitle>
+                <DialogDescription>
+                  {removeOrderItemTarget.cancelsOrder
+                    ? `Removing ${removeOrderItemTarget.itemName} will leave the order empty and mark it as cancelled.`
+                    : `Remove ${removeOrderItemTarget.itemName} from the order.`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild disabled={isRemovingOrderItem}>
+                  <Button variant="secondary" size="form" type="button">
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <LoadingButton
+                  size="form"
+                  type="button"
+                  loading={isRemovingOrderItem}
+                  loadingLabel="Removing item..."
+                  disabled={isRemovingOrderItem}
+                  onClick={() => void handleConfirmRemoveOrderItem()}
+                >
+                  {removeOrderItemTarget.cancelsOrder ? 'Remove item and cancel order' : 'Remove item'}
+                </LoadingButton>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(clearTargetSession)}

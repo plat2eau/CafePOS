@@ -56,6 +56,7 @@ type OrderCardItem = {
   name: string
   quantity: number
   total: string
+  actions?: React.ReactNode
 }
 
 type OrderCardProps = {
@@ -92,7 +93,10 @@ function OrderCard({
             <span>
               {item.name} x {item.quantity}
             </span>
-            <strong>{item.total}</strong>
+            <div className="flex shrink-0 items-center gap-2">
+              {item.actions}
+              <strong>{item.total}</strong>
+            </div>
           </SummaryRow>
         ))}
       </div>
