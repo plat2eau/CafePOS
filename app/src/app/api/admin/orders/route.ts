@@ -9,6 +9,7 @@ import type { AdminOrder } from '@/lib/admin-data'
 type RequestedOrderItem = {
   itemId?: string
   quantity?: number
+  portion?: string
 }
 
 type RequestedCustomItem = {
@@ -49,7 +50,8 @@ export async function POST(request: Request) {
     ? body.items
         .map((item) => ({
           itemId: String(item?.itemId ?? '').trim(),
-          quantity: Number(item?.quantity ?? 0)
+          quantity: Number(item?.quantity ?? 0),
+          portion: item?.portion === 'half' || item?.portion === 'full' ? item.portion : null
         }))
         .filter((item) => item.itemId && Number.isInteger(item.quantity) && item.quantity > 0)
     : []
@@ -176,15 +178,26 @@ export async function POST(request: Request) {
       unit_price_cents: number
       quantity: number
       line_total_cents: number
+      portion: 'half' | 'full' | null
     }> = []
 
     const uniqueItemIds = Array.from(new Set(requestedItems.map((item) => item.itemId)))
-    const menuItemMap = new Map<string, { id: string; name: string; price_cents: number; is_available: boolean }>()
+    const menuItemMap = new Map<
+      string,
+      {
+        id: string
+        name: string
+        price_cents: number
+        half_price_cents: number | null
+        full_price_cents: number | null
+        is_available: boolean
+      }
+    >()
 
     if (uniqueItemIds.length > 0) {
       const { data: menuItems, error: menuItemsError } = await supabase
         .from('menu_items')
-        .select('id, name, price_cents, is_available')
+        .select('id, name, price_cents, half_price_cents, full_price_cents, is_available')
         .in('id', uniqueItemIds)
 
       if (menuItemsError || !menuItems) {
@@ -206,13 +219,36 @@ export async function POST(request: Request) {
         throw new Error('Invalid menu item.')
       }
 
-      const lineTotalCents = menuItem.price_cents * requestedItem.quantity
+      const portionEnabled = (menuItem.half_price_cents ?? 0) > 0 && (menuItem.full_price_cents ?? 0) > 0
+      let portion = requestedItem.portion as 'half' | 'full' | null
+
+      if (portion && !portionEnabled) {
+        throw new Error('Invalid portion selection.')
+      }
+
+      if (!portion && portionEnabled) {
+        portion = 'full'
+      }
+
+      const unitPriceCents =
+        portion === 'half'
+          ? menuItem.half_price_cents
+          : portion === 'full'
+            ? menuItem.full_price_cents
+            : menuItem.price_cents
+
+      if (typeof unitPriceCents !== 'number' || !Number.isFinite(unitPriceCents) || unitPriceCents < 0) {
+        throw new Error('Invalid menu item price.')
+      }
+
+      const lineTotalCents = unitPriceCents * requestedItem.quantity
       totalCents += lineTotalCents
 
       normalizedOrderItems.push({
         menu_item_id: menuItem.id,
-        item_name: menuItem.name,
-        unit_price_cents: menuItem.price_cents,
+        portion,
+        item_name: portion ? `${menuItem.name} (${portion === 'half' ? 'Half' : 'Full'})` : menuItem.name,
+        unit_price_cents: unitPriceCents,
         quantity: requestedItem.quantity,
         line_total_cents: lineTotalCents
       })
@@ -224,6 +260,7 @@ export async function POST(request: Request) {
 
       normalizedOrderItems.push({
         menu_item_id: null,
+        portion: null,
         item_name: customItem.name,
         unit_price_cents: customItem.unitPriceCents,
         quantity: customItem.quantity,

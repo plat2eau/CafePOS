@@ -49,11 +49,21 @@ type OrderStatus = Database['public']['Tables']['orders']['Row']['status']
 
 const orderStatuses: OrderStatus[] = ['placed', 'preparing', 'served', 'cancelled']
 
+type Portion = 'half' | 'full'
+
 type CustomOrderItemDraft = {
   id: string
   name: string
   unitPriceCents: number
   quantity: number
+}
+
+function buildQuantityKey(itemId: string, portion?: Portion | null) {
+  return portion ? `${itemId}::${portion}` : itemId
+}
+
+function isPortionEnabled(item: Pick<AdminMenuItem, 'half_price_cents' | 'full_price_cents'>) {
+  return (item.half_price_cents ?? 0) > 0 && (item.full_price_cents ?? 0) > 0
 }
 
 function toPrice(priceCents: number) {
@@ -228,14 +238,58 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
 
   const selectedItems = useMemo(
     () =>
-      menuItems
-        .map((item) => ({
-          itemId: item.id,
-          name: item.name,
-          priceCents: item.price_cents,
-          quantity: quantities[item.id] ?? 0
-        }))
-        .filter((item) => item.quantity > 0),
+      menuItems.flatMap((item) => {
+        if (!isPortionEnabled(item)) {
+          const quantity = quantities[buildQuantityKey(item.id)] ?? 0
+          return quantity > 0
+            ? [
+                {
+                  key: buildQuantityKey(item.id),
+                  itemId: item.id,
+                  portion: null as Portion | null,
+                  name: item.name,
+                  unitPriceCents: item.price_cents,
+                  quantity
+                }
+              ]
+            : []
+        }
+
+        const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
+        const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
+        const result: Array<{
+          key: string
+          itemId: string
+          portion: Portion | null
+          name: string
+          unitPriceCents: number
+          quantity: number
+        }> = []
+
+        if (halfQuantity > 0) {
+          result.push({
+            key: buildQuantityKey(item.id, 'half'),
+            itemId: item.id,
+            portion: 'half',
+            name: `${item.name} (Half)`,
+            unitPriceCents: item.half_price_cents ?? 0,
+            quantity: halfQuantity
+          })
+        }
+
+        if (fullQuantity > 0) {
+          result.push({
+            key: buildQuantityKey(item.id, 'full'),
+            itemId: item.id,
+            portion: 'full',
+            name: `${item.name} (Full)`,
+            unitPriceCents: item.full_price_cents ?? 0,
+            quantity: fullQuantity
+          })
+        }
+
+        return result
+      }),
     [menuItems, quantities]
   )
 
@@ -259,7 +313,7 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
 
   const totalCents = useMemo(
     () =>
-      selectedItems.reduce((sum, item) => sum + item.priceCents * item.quantity, 0) +
+      selectedItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0) +
       normalizedCustomItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0),
     [normalizedCustomItems, selectedItems]
   )
@@ -275,18 +329,19 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
     ? `${filteredMenuItems.length} matching item${filteredMenuItems.length === 1 ? '' : 's'}`
     : `${menuItems.length} item${menuItems.length === 1 ? '' : 's'} available`
 
-  function adjustQuantity(itemId: string, delta: number) {
+  function adjustQuantity(itemId: string, delta: number, portion?: Portion | null) {
     setQuantities((current) => {
-      const nextQuantity = Math.max(0, (current[itemId] ?? 0) + delta)
+      const key = buildQuantityKey(itemId, portion ?? null)
+      const nextQuantity = Math.max(0, (current[key] ?? 0) + delta)
 
       if (nextQuantity === 0) {
-        const { [itemId]: _removed, ...rest } = current
+        const { [key]: _removed, ...rest } = current
         return rest
       }
 
       return {
         ...current,
-        [itemId]: nextQuantity
+        [key]: nextQuantity
       }
     })
   }
@@ -390,7 +445,8 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
         note,
         items: selectedItems.map((item) => ({
           itemId: item.itemId,
-          quantity: item.quantity
+          quantity: item.quantity,
+          portion: item.portion ?? undefined
         })),
         customItems: normalizedCustomItems.map((item) => ({
           name: item.name,
@@ -1252,20 +1308,59 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                 ) : (
                   filteredMenuItems.map((item) => (
                     <div className="adminMenuItemRow" key={item.id}>
+                      {(() => {
+                        const portionEnabled = isPortionEnabled(item)
+                        const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
+                        const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
+
+                        return (
+                          <>
                       <div className="stack">
                         <SummaryRow>
                           <strong>{item.name}</strong>
-                          <span>{toPrice(item.price_cents)}</span>
+                          <span>
+                            {portionEnabled
+                              ? `Half ${toPrice(item.half_price_cents ?? 0)} · Full ${toPrice(item.full_price_cents ?? 0)}`
+                              : toPrice(item.price_cents)}
+                          </span>
                         </SummaryRow>
                         {item.description ? <p>{item.description}</p> : null}
                       </div>
-                      <QuantityStepper
-                        value={quantities[item.id] ?? 0}
-                        decrementLabel={`Remove one ${item.name}`}
-                        incrementLabel={`Add one ${item.name}`}
-                        onDecrement={() => adjustQuantity(item.id, -1)}
-                        onIncrement={() => adjustQuantity(item.id, 1)}
-                      />
+                      {portionEnabled ? (
+                        <div className="adminPortionStepperColumn">
+                          <div className="adminPortionStepperRow">
+                            <span className="adminPortionLabel">Half</span>
+                            <QuantityStepper
+                              value={halfQuantity}
+                              decrementLabel={`Remove half ${item.name}`}
+                              incrementLabel={`Add half ${item.name}`}
+                              onDecrement={() => adjustQuantity(item.id, -1, 'half')}
+                              onIncrement={() => adjustQuantity(item.id, 1, 'half')}
+                            />
+                          </div>
+                          <div className="adminPortionStepperRow">
+                            <span className="adminPortionLabel">Full</span>
+                            <QuantityStepper
+                              value={fullQuantity}
+                              decrementLabel={`Remove full ${item.name}`}
+                              incrementLabel={`Add full ${item.name}`}
+                              onDecrement={() => adjustQuantity(item.id, -1, 'full')}
+                              onIncrement={() => adjustQuantity(item.id, 1, 'full')}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <QuantityStepper
+                          value={quantities[buildQuantityKey(item.id)] ?? 0}
+                          decrementLabel={`Remove one ${item.name}`}
+                          incrementLabel={`Add one ${item.name}`}
+                          onDecrement={() => adjustQuantity(item.id, -1)}
+                          onIncrement={() => adjustQuantity(item.id, 1)}
+                        />
+                      )}
+                          </>
+                        )
+                      })()}
                     </div>
                   ))
                 )}
@@ -1302,20 +1397,20 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                 ) : null}
 
                 {selectedItems.map((item) => (
-                    <div className="adminOrderSummaryItem" key={item.itemId}>
+                    <div className="adminOrderSummaryItem" key={item.key}>
                       <div className="stack">
                         <SummaryRow>
                           <strong>{item.name}</strong>
-                          <span>{toPrice(item.priceCents * item.quantity)}</span>
+                          <span>{toPrice(item.unitPriceCents * item.quantity)}</span>
                         </SummaryRow>
-                        <p className="finePrint">{toPrice(item.priceCents)} each</p>
+                        <p className="finePrint">{toPrice(item.unitPriceCents)} each</p>
                       </div>
                       <QuantityStepper
                         value={item.quantity}
                         decrementLabel={`Reduce ${item.name}`}
                         incrementLabel={`Increase ${item.name}`}
-                        onDecrement={() => adjustQuantity(item.itemId, -1)}
-                        onIncrement={() => adjustQuantity(item.itemId, 1)}
+                        onDecrement={() => adjustQuantity(item.itemId, -1, item.portion)}
+                        onIncrement={() => adjustQuantity(item.itemId, 1, item.portion)}
                       />
                     </div>
                   ))}

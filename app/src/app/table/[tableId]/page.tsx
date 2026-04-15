@@ -65,7 +65,7 @@ export default async function TablePage({ params }: TablePageProps) {
       .order('sort_order', { ascending: true }),
     supabase
       .from('menu_items')
-      .select('id, category_id, name, description, price_cents, is_available, sort_order, created_at, updated_at')
+      .select('id, category_id, name, description, price_cents, half_price_cents, full_price_cents, is_available, sort_order, created_at, updated_at')
       .eq('is_available', true)
       .order('sort_order', { ascending: true })
   ])
@@ -143,13 +143,13 @@ export default async function TablePage({ params }: TablePageProps) {
           </div>
         </div>
 
-        {canAccessOrdering ? (
-          <div className="buttonRow">
-            <Button asChild size="form" className="md:w-auto">
-              <Link href={`/table/${tableId}/orders`}>View order history</Link>
-            </Button>
-          </div>
-        ) : null}
+	        {canAccessOrdering ? (
+	          <div className="buttonRow">
+	            <Button asChild size="form" variant="default" className="md:w-auto" >
+	              <Link href={`/table/${tableId}/orders`} style={{color: "white"}}>View order history</Link>
+	            </Button>
+	          </div>
+	        ) : null}
 
         {!hasError && table && table.is_active && !canAccessOrdering && (
           <SectionCard

@@ -29,6 +29,8 @@ export type Database = {
           category_id: string
           created_at: string
           description: string | null
+          full_price_cents: number | null
+          half_price_cents: number | null
           id: string
           is_available: boolean
           name: string
@@ -40,6 +42,8 @@ export type Database = {
           category_id: string
           created_at?: string
           description?: string | null
+          full_price_cents?: number | null
+          half_price_cents?: number | null
           id: string
           is_available?: boolean
           name: string
@@ -51,6 +55,8 @@ export type Database = {
           category_id?: string
           created_at?: string
           description?: string | null
+          full_price_cents?: number | null
+          half_price_cents?: number | null
           id?: string
           is_available?: boolean
           name?: string
@@ -76,6 +82,7 @@ export type Database = {
           line_total_cents: number
           menu_item_id: string | null
           order_id: string
+          portion: 'half' | 'full' | null
           quantity: number
           unit_price_cents: number
         }
@@ -86,6 +93,7 @@ export type Database = {
           line_total_cents: number
           menu_item_id: string | null
           order_id: string
+          portion?: 'half' | 'full' | null
           quantity: number
           unit_price_cents: number
         }
@@ -96,6 +104,7 @@ export type Database = {
           line_total_cents?: number
           menu_item_id?: string | null
           order_id?: string
+          portion?: 'half' | 'full' | null
           quantity?: number
           unit_price_cents?: number
         }

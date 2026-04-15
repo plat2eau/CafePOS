@@ -3,6 +3,7 @@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import type { ReactNode } from 'react'
 
 type SearchBarProps = {
   value: string
@@ -11,6 +12,7 @@ type SearchBarProps = {
   placeholder?: string
   summary?: string
   className?: string
+  children?: ReactNode
 }
 
 export default function SearchBar({
@@ -19,16 +21,14 @@ export default function SearchBar({
   label = 'Search',
   placeholder = 'Search',
   summary,
-  className = ''
+  className = '',
+  children
 }: SearchBarProps) {
   const inputId = `search-bar-${label.toLowerCase().replace(/\s+/g, '-')}`
 
   return (
     <div className={cn('searchBarShell', className)}>
       <div className="searchBarField">
-        <Label className="searchBarLabel" htmlFor={inputId}>
-          {label}
-        </Label>
         <div className="searchBarInputWrap">
           <Input
             id={inputId}
@@ -42,7 +42,8 @@ export default function SearchBar({
         </div>
       </div>
 
-      {summary ? <p className="searchBarSummary">{summary}</p> : null}
+      {/* {summary ? <p className="searchBarSummary">{summary}</p> : null} */}
+      {children ? <div className="searchBarExtras">{children}</div> : null}
     </div>
   )
 }

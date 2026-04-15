@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useActionState, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PlaceOrderActionState } from '@/app/table/[tableId]/actions'
 import AppOverlaySheet from '@/components/AppOverlaySheet'
@@ -14,6 +14,8 @@ import { SectionCard } from '@/components/ui/section-card'
 import { SummaryRow } from '@/components/ui/summary-row'
 import { Textarea } from '@/components/ui/textarea'
 
+type Portion = 'half' | 'full'
+
 type MenuCategory = {
   id: string
   name: string
@@ -25,6 +27,8 @@ type MenuItem = {
   name: string
   description: string | null
   price_cents: number
+  half_price_cents: number | null
+  full_price_cents: number | null
 }
 
 type GuestOrderingExperienceProps = {
@@ -50,6 +54,29 @@ function toPrice(priceCents: number) {
   }).format(priceCents / 100)
 }
 
+function buildQuantityKey(itemId: string, portion?: Portion | null) {
+  return portion ? `${itemId}::${portion}` : itemId
+}
+
+function isPortionEnabled(item: Pick<MenuItem, 'half_price_cents' | 'full_price_cents'>) {
+  return (item.half_price_cents ?? 0) > 0 && (item.full_price_cents ?? 0) > 0
+}
+
+function getDietLabel(description: string | null) {
+  const normalized = description?.trim().toLowerCase() ?? ''
+  if (!normalized) return null
+
+  if (/\bnon[-\s]?veg\b/i.test(normalized)) {
+    return 'Non veg'
+  }
+
+  if (/\bveg\b/i.test(normalized)) {
+    return 'Veg'
+  }
+
+  return null
+}
+
 export default function GuestOrderingExperience({
   tableId,
   categories,
@@ -66,9 +93,35 @@ export default function GuestOrderingExperience({
   const [showSuccessCard, setShowSuccessCard] = useState(false)
   const [isOrderSheetOpen, setIsOrderSheetOpen] = useState(false)
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
+  const [portionDrawerItemId, setPortionDrawerItemId] = useState<string | null>(null)
+  const searchBarWrapRef = useRef<HTMLDivElement | null>(null)
+  const mobileNavigatorInnerRef = useRef<HTMLDivElement | null>(null)
+  const lastNavigatorScrollIdRef = useRef<string | null>(null)
+  const [menuStickyOffsetPx, setMenuStickyOffsetPx] = useState<number>(92)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
   const orderFormId = `guest-order-form-${tableId}`
+
+  useEffect(() => {
+    const element = searchBarWrapRef.current
+    if (!element) return
+
+    const updateOffset = () => {
+      const height = element.getBoundingClientRect().height
+      setMenuStickyOffsetPx(Math.round(height + 24))
+    }
+
+    updateOffset()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateOffset)
+      return () => window.removeEventListener('resize', updateOffset)
+    }
+
+    const observer = new ResizeObserver(updateOffset)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   const filteredItems = useMemo(() => {
     if (!normalizedSearchQuery) {
@@ -116,23 +169,148 @@ export default function GuestOrderingExperience({
 
   const [activeCategoryId, setActiveCategoryId] = useState(categorySections[0]?.id ?? '')
 
+  useEffect(() => {
+    if (!categorySections.some((category) => category.id === activeCategoryId)) {
+      setActiveCategoryId(categorySections[0]?.id ?? '')
+    }
+  }, [activeCategoryId, categorySections])
+
+  useEffect(() => {
+    if (categorySections.length < 2) return
+
+    const categoriesWithElements = categorySections
+      .map((category) => ({
+        id: category.id,
+        element: document.getElementById(category.anchorId)
+      }))
+      .filter(
+        (entry): entry is { id: string; element: HTMLElement } => entry.element instanceof HTMLElement
+      )
+
+    if (categoriesWithElements.length < 2) return
+
+    const triggerPx = 24
+    let rafId: number | null = null
+
+    const updateActiveCategory = () => {
+      rafId = null
+      let bestId: string | null = null
+      let bestTop = Number.NEGATIVE_INFINITY
+      let closestPositiveId: string | null = null
+      let closestPositiveTop = Number.POSITIVE_INFINITY
+
+      for (const entry of categoriesWithElements) {
+        const top = entry.element.getBoundingClientRect().top - menuStickyOffsetPx
+
+        if (top <= triggerPx && top > bestTop) {
+          bestTop = top
+          bestId = entry.id
+        } else if (top > triggerPx && top < closestPositiveTop) {
+          closestPositiveTop = top
+          closestPositiveId = entry.id
+        }
+      }
+
+      const nextId = bestId ?? closestPositiveId ?? categorySections[0]?.id ?? ''
+      if (nextId && nextId !== activeCategoryId) {
+        setActiveCategoryId(nextId)
+      }
+    }
+
+    const handleScroll = () => {
+      if (rafId !== null) return
+      rafId = window.requestAnimationFrame(updateActiveCategory)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId)
+      }
+    }
+  }, [activeCategoryId, categorySections, menuStickyOffsetPx])
+
+  useEffect(() => {
+    if (categorySections.length < 2) return
+    if (typeof window === 'undefined') return
+    if (window.matchMedia('(min-width: 640px)').matches) return
+    if (!activeCategoryId) return
+
+    const container = mobileNavigatorInnerRef.current
+    if (!container) return
+
+    if (lastNavigatorScrollIdRef.current === activeCategoryId) return
+
+    const pill = container.querySelector(
+      `[data-category-id="${activeCategoryId}"]`
+    ) as HTMLElement | null
+    if (!pill) return
+
+    lastNavigatorScrollIdRef.current = activeCategoryId
+    pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }, [activeCategoryId, categorySections.length])
+
   const selectedItems = useMemo(
     () =>
-      items
-        .map((item) => ({
-          itemId: item.id,
-          quantity: quantities[item.id] ?? 0,
-          name: item.name,
-          priceCents: item.price_cents
-        }))
-        .filter((item) => item.quantity > 0),
+      items.flatMap((item) => {
+        if (!isPortionEnabled(item)) {
+          const quantity = quantities[buildQuantityKey(item.id)] ?? 0
+          return quantity > 0
+            ? [
+                {
+                  key: buildQuantityKey(item.id),
+                  itemId: item.id,
+                  portion: null as Portion | null,
+                  quantity,
+                  name: item.name,
+                  unitPriceCents: item.price_cents
+                }
+              ]
+            : []
+        }
+
+        const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
+        const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
+        const result: Array<{
+          key: string
+          itemId: string
+          portion: Portion | null
+          quantity: number
+          name: string
+          unitPriceCents: number
+        }> = []
+
+        if (halfQuantity > 0) {
+          result.push({
+            key: buildQuantityKey(item.id, 'half'),
+            itemId: item.id,
+            portion: 'half',
+            quantity: halfQuantity,
+            name: `${item.name} (Half)`,
+            unitPriceCents: item.half_price_cents ?? 0
+          })
+        }
+
+        if (fullQuantity > 0) {
+          result.push({
+            key: buildQuantityKey(item.id, 'full'),
+            itemId: item.id,
+            portion: 'full',
+            quantity: fullQuantity,
+            name: `${item.name} (Full)`,
+            unitPriceCents: item.full_price_cents ?? 0
+          })
+        }
+
+        return result
+      }),
     [items, quantities]
   )
 
-  const totalCents = selectedItems.reduce(
-    (sum, item) => sum + item.quantity * item.priceCents,
-    0
-  )
+  const totalCents = selectedItems.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0)
 
   useEffect(() => {
     if (state.status === 'success') {
@@ -141,6 +319,7 @@ export default function GuestOrderingExperience({
       setShowSuccessCard(true)
       setIsOrderSheetOpen(false)
       setIsNavigatorOpen(false)
+      setPortionDrawerItemId(null)
       const timeout = window.setTimeout(() => {
         router.push(`/table/${tableId}/orders?placed=1`)
       }, 900)
@@ -218,15 +397,32 @@ export default function GuestOrderingExperience({
 
   function adjustQuantity(itemId: string, delta: number) {
     setQuantities((current) => {
-      const nextQuantity = Math.max(0, (current[itemId] ?? 0) + delta)
+      const key = buildQuantityKey(itemId)
+      const nextQuantity = Math.max(0, (current[key] ?? 0) + delta)
       if (nextQuantity === 0) {
-        const { [itemId]: _removed, ...rest } = current
+        const { [key]: _removed, ...rest } = current
         return rest
       }
 
       return {
         ...current,
-        [itemId]: nextQuantity
+        [key]: nextQuantity
+      }
+    })
+  }
+
+  function adjustPortionQuantity(itemId: string, portion: Portion, delta: number) {
+    setQuantities((current) => {
+      const key = buildQuantityKey(itemId, portion)
+      const nextQuantity = Math.max(0, (current[key] ?? 0) + delta)
+      if (nextQuantity === 0) {
+        const { [key]: _removed, ...rest } = current
+        return rest
+      }
+
+      return {
+        ...current,
+        [key]: nextQuantity
       }
     })
   }
@@ -252,13 +448,23 @@ export default function GuestOrderingExperience({
         value={JSON.stringify(
           selectedItems.map((item) => ({
             itemId: item.itemId,
-            quantity: item.quantity
+            quantity: item.quantity,
+            portion: item.portion ?? undefined
           }))
         )}
       />
       <input type="hidden" name="note" value={note} />
 
-      <div className="orderLayout">
+      <div
+        className="orderLayout"
+        style={
+          menuStickyOffsetPx
+            ? ({
+                '--menu-sticky-offset': `${menuStickyOffsetPx}px`
+              } as any)
+            : undefined
+        }
+      >
         <div className="sectionStack">
           {showSuccessCard ? (
             <SectionCard tone="success">
@@ -277,14 +483,34 @@ export default function GuestOrderingExperience({
             </SectionCard>
           ) : null}
 
-          <div className="menuSearchBarWrap">
+          <div className="menuSearchBarWrap" ref={searchBarWrapRef}>
             <SearchBar
               label="Menu search"
               placeholder="Search coffee, tea, snacks..."
               value={searchQuery}
               onChange={setSearchQuery}
               summary={searchSummary}
-            />
+            >
+              {categorySections.length > 1 ? (
+                <nav className="menuFloatingNavigator sm:hidden" aria-label="Menu sections">
+                  <div className="menuFloatingNavigatorInner" ref={mobileNavigatorInnerRef}>
+                    {categorySections.map((category) => (
+                      <Button
+                        key={category.id}
+                        className="menuFloatingNavigatorPill"
+                        size="sm"
+                        variant={activeCategoryId === category.id ? 'default' : 'secondary'}
+                        type="button"
+                        data-category-id={category.id}
+                        onClick={() => jumpToCategory(category.id, category.anchorId)}
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </div>
+                </nav>
+              ) : null}
+            </SearchBar>
           </div>
 
           <div className="grid">
@@ -302,33 +528,73 @@ export default function GuestOrderingExperience({
                   id={category.anchorId}
                   data-category-id={category.id}
                 >
-                  <p className="eyebrow">{category.name}</p>
-                  <h2>{category.name}</h2>
+                  <div className="menuCategoryHeader">
+                    <p className="eyebrow">{category.name}</p>
+                    <h2>{category.name}</h2>
+                  </div>
                   {(itemsByCategory.get(category.id) ?? []).length === 0 ? (
                     <p>No available items in this category yet.</p>
                   ) : (
                     <div className="stack">
                       {(itemsByCategory.get(category.id) ?? []).map((item) => {
-                        const quantity = quantities[item.id] ?? 0
+                        const portionEnabled = isPortionEnabled(item)
+                        const quantity = quantities[buildQuantityKey(item.id)] ?? 0
+                        const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
+                        const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
+                        const hasPortionSelection = halfQuantity > 0 || fullQuantity > 0
+                        const dietLabel = portionEnabled ? getDietLabel(item.description) : null
 
                         return (
                           <div className="menuItem" key={item.id}>
                             <div className="sectionStack compact">
                               <div>
                                 <h3>{item.name}</h3>
-                                {item.description ? <p>{item.description}</p> : null}
+                                {portionEnabled ? (
+                                  <p>
+                                    {dietLabel ? `${dietLabel} · Variable serving` : 'Variable serving'}
+                                  </p>
+                                ) : item.description ? (
+                                  <p>{item.description}</p>
+                                ) : null}
                               </div>
-                              <strong>{toPrice(item.price_cents)}</strong>
+                              <strong>
+                                {portionEnabled
+                                  ? `Half ${toPrice(item.half_price_cents ?? 0)}`
+                                  : toPrice(item.price_cents)}
+                              </strong>
                             </div>
 
-                            <QuantityStepper
-                              value={quantity}
-                              disabled={previewMode}
-                              decrementLabel={`Remove one ${item.name}`}
-                              incrementLabel={`Add one ${item.name}`}
-                              onDecrement={() => adjustQuantity(item.id, -1)}
-                              onIncrement={() => adjustQuantity(item.id, 1)}
-                            />
+                            {portionEnabled ? (
+                              <div className="portionMenuActionRow">
+                                {hasPortionSelection ? (
+                                  <p className="finePrint">
+                                    {halfQuantity > 0 ? `Half x ${halfQuantity}` : null}
+                                    {halfQuantity > 0 && fullQuantity > 0 ? ' · ' : null}
+                                    {fullQuantity > 0 ? `Full x ${fullQuantity}` : null}
+                                  </p>
+                                ) : (
+                                  <p className="finePrint">Choose portion size.</p>
+                                )}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={previewMode}
+                                  onClick={() => setPortionDrawerItemId(item.id)}
+                                >
+                                  {hasPortionSelection ? 'Edit' : 'Add'}
+                                </Button>
+                              </div>
+                            ) : (
+                              <QuantityStepper
+                                value={quantity}
+                                disabled={previewMode}
+                                decrementLabel={`Remove one ${item.name}`}
+                                incrementLabel={`Add one ${item.name}`}
+                                onDecrement={() => adjustQuantity(item.id, -1)}
+                                onIncrement={() => adjustQuantity(item.id, 1)}
+                              />
+                            )}
                           </div>
                         )
                       })}
@@ -358,7 +624,7 @@ export default function GuestOrderingExperience({
           <ActionGroup className="sm:justify-end">
             {categorySections.length > 1 ? (
               <Button
-                className="sm:w-auto"
+                className="sm:w-auto menuSectionsButton"
                 variant="secondary"
                 size="form"
                 type="button"
@@ -391,11 +657,11 @@ export default function GuestOrderingExperience({
               <p>No items selected yet.</p>
             ) : (
               selectedItems.map((item) => (
-                <SummaryRow key={item.itemId}>
+                <SummaryRow key={item.key}>
                   <span>
                     {item.name} x {item.quantity}
                   </span>
-                  <strong>{toPrice(item.quantity * item.priceCents)}</strong>
+                  <strong>{toPrice(item.quantity * item.unitPriceCents)}</strong>
                 </SummaryRow>
               ))
             )}
@@ -458,6 +724,75 @@ export default function GuestOrderingExperience({
                 </Button>
               ))}
             </div>
+          </AppOverlaySheet>
+        ) : null}
+
+        {portionDrawerItemId ? (
+          <AppOverlaySheet
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setPortionDrawerItemId(null)
+              }
+            }}
+            eyebrow="Portion size"
+            title={items.find((item) => item.id === portionDrawerItemId)?.name ?? 'Choose portion'}
+            description="Select half or full and adjust quantity."
+          >
+            {(() => {
+              const item = items.find((entry) => entry.id === portionDrawerItemId)
+              if (!item || !isPortionEnabled(item)) {
+                return <p className="finePrint">This item does not support portions.</p>
+              }
+
+              const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
+              const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
+
+              return (
+                <div className="stack mt-0">
+                  <div className="portionDrawerRow">
+                    <div className="stack">
+                      <SummaryRow>
+                        <strong>Half</strong>
+                        <span>{toPrice(item.half_price_cents ?? 0)}</span>
+                      </SummaryRow>
+                      <p className="finePrint">Per half plate</p>
+                    </div>
+                    <QuantityStepper
+                      value={halfQuantity}
+                      disabled={previewMode}
+                      decrementLabel={`Remove half ${item.name}`}
+                      incrementLabel={`Add half ${item.name}`}
+                      onDecrement={() => adjustPortionQuantity(item.id, 'half', -1)}
+                      onIncrement={() => adjustPortionQuantity(item.id, 'half', 1)}
+                    />
+                  </div>
+
+                  <div className="portionDrawerRow">
+                    <div className="stack">
+                      <SummaryRow>
+                        <strong>Full</strong>
+                        <span>{toPrice(item.full_price_cents ?? 0)}</span>
+                      </SummaryRow>
+                      <p className="finePrint">Per full plate</p>
+                    </div>
+                    <QuantityStepper
+                      value={fullQuantity}
+                      disabled={previewMode}
+                      decrementLabel={`Remove full ${item.name}`}
+                      incrementLabel={`Add full ${item.name}`}
+                      onDecrement={() => adjustPortionQuantity(item.id, 'full', -1)}
+                      onIncrement={() => adjustPortionQuantity(item.id, 'full', 1)}
+                    />
+                  </div>
+
+                  <SummaryRow variant="total">
+                    <span>Total</span>
+                    <strong>{toPrice(totalCents)}</strong>
+                  </SummaryRow>
+                </div>
+              )
+            })()}
           </AppOverlaySheet>
         ) : null}
       </div>

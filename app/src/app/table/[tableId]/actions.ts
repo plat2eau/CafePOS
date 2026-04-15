@@ -64,12 +64,20 @@ async function setTableOrderIdentityCookie(tableId: string, identity: TableOrder
 
 function normalizeOrderItems(rawValue: string) {
   try {
-    const parsed = JSON.parse(rawValue) as Array<{ itemId?: string; quantity?: number }>
+    const parsed = JSON.parse(rawValue) as Array<{
+      itemId?: string
+      quantity?: number
+      portion?: string
+    }>
 
     return parsed
       .map((entry) => ({
         itemId: String(entry.itemId ?? '').trim(),
-        quantity: Number(entry.quantity ?? 0)
+        quantity: Number(entry.quantity ?? 0),
+        portion:
+          entry.portion === 'half' || entry.portion === 'full'
+            ? (entry.portion as 'half' | 'full')
+            : null
       }))
       .filter((entry) => entry.itemId && Number.isInteger(entry.quantity) && entry.quantity > 0)
   } catch {
@@ -274,7 +282,7 @@ export async function placeOrderForTable(
   const uniqueItemIds = Array.from(new Set(requestedItems.map((item) => item.itemId)))
   const { data: menuItems, error: menuItemsError } = await supabase
     .from('menu_items')
-    .select('id, name, price_cents, is_available')
+    .select('id, name, price_cents, half_price_cents, full_price_cents, is_available')
     .in('id', uniqueItemIds)
 
   if (menuItemsError || !menuItems) {
@@ -287,24 +295,63 @@ export async function placeOrderForTable(
   const menuItemMap = new Map(menuItems.map((item) => [item.id, item]))
   let totalCents = 0
 
-  const normalizedOrderItems = requestedItems.map((requestedItem) => {
-    const menuItem = menuItemMap.get(requestedItem.itemId)
+  let normalizedOrderItems: Array<{
+    menu_item_id: string
+    portion: 'half' | 'full' | null
+    item_name: string
+    unit_price_cents: number
+    quantity: number
+    line_total_cents: number
+  }> = []
 
-    if (!menuItem || !menuItem.is_available) {
-      throw new Error(`Invalid or unavailable item: ${requestedItem.itemId}`)
-    }
+  try {
+    normalizedOrderItems = requestedItems.map((requestedItem) => {
+      const menuItem = menuItemMap.get(requestedItem.itemId)
 
-    const lineTotalCents = menuItem.price_cents * requestedItem.quantity
-    totalCents += lineTotalCents
+      if (!menuItem || !menuItem.is_available) {
+        throw new Error(`Invalid or unavailable item: ${requestedItem.itemId}`)
+      }
 
+      const portionEnabled = (menuItem.half_price_cents ?? 0) > 0 && (menuItem.full_price_cents ?? 0) > 0
+      let portion = requestedItem.portion
+
+      if (portion && !portionEnabled) {
+        throw new Error(`Portion selection is not available for item: ${requestedItem.itemId}`)
+      }
+
+      if (!portion && portionEnabled) {
+        portion = 'full'
+      }
+
+      const unitPriceCents =
+        portion === 'half'
+          ? menuItem.half_price_cents
+          : portion === 'full'
+            ? menuItem.full_price_cents
+            : menuItem.price_cents
+
+      if (typeof unitPriceCents !== 'number' || !Number.isFinite(unitPriceCents) || unitPriceCents < 0) {
+        throw new Error(`Invalid unit price for item: ${requestedItem.itemId}`)
+      }
+
+      const lineTotalCents = unitPriceCents * requestedItem.quantity
+      totalCents += lineTotalCents
+
+      return {
+        menu_item_id: menuItem.id,
+        portion,
+        item_name: portion ? `${menuItem.name} (${portion === 'half' ? 'Half' : 'Full'})` : menuItem.name,
+        unit_price_cents: unitPriceCents,
+        quantity: requestedItem.quantity,
+        line_total_cents: lineTotalCents
+      }
+    })
+  } catch {
     return {
-      menu_item_id: menuItem.id,
-      item_name: menuItem.name,
-      unit_price_cents: menuItem.price_cents,
-      quantity: requestedItem.quantity,
-      line_total_cents: lineTotalCents
+      status: 'error',
+      message: 'One or more selected items are unavailable.'
     }
-  })
+  }
 
   if (normalizedOrderItems.length === 0) {
     return {

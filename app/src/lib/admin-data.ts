@@ -46,7 +46,7 @@ export type AdminSession = {
 
 export type AdminMenuItem = Pick<
   Database['public']['Tables']['menu_items']['Row'],
-  'id' | 'category_id' | 'name' | 'description' | 'price_cents' | 'sort_order'
+  'id' | 'category_id' | 'name' | 'description' | 'price_cents' | 'half_price_cents' | 'full_price_cents' | 'sort_order'
 >
 
 export type AdminTableOption = Pick<
@@ -186,7 +186,7 @@ export async function getAdminMenuItems(): Promise<AdminMenuItem[]> {
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('menu_items')
-    .select('id, category_id, name, description, price_cents, sort_order')
+    .select('id, category_id, name, description, price_cents, half_price_cents, full_price_cents, sort_order')
     .eq('is_available', true)
     .order('sort_order', { ascending: true })
 
