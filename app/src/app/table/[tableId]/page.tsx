@@ -114,6 +114,7 @@ export default async function TablePage({ params, searchParams }: TablePageProps
   const receiptOrders: AdminOrder[] = (orders ?? []).map((order) => ({
     id: order.id,
     table_id: tableId,
+    out_check_id: null,
     created_at: order.created_at,
     status: order.status as AdminOrder['status'],
     note: order.note,

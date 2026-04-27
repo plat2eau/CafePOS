@@ -131,6 +131,7 @@ export type Database = {
           created_at: string
           id: string
           note: string | null
+          out_check_id: string | null
           ordered_by_name: string
           ordered_by_phone: string
           order_type: 'table' | 'out'
@@ -145,6 +146,7 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
+          out_check_id?: string | null
           ordered_by_name: string
           ordered_by_phone: string
           order_type?: 'table' | 'out'
@@ -159,6 +161,7 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
+          out_check_id?: string | null
           ordered_by_name?: string
           ordered_by_phone?: string
           order_type?: 'table' | 'out'
@@ -169,6 +172,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'orders_out_check_id_fkey'
+            columns: ['out_check_id']
+            isOneToOne: false
+            referencedRelation: 'out_checks'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'orders_session_id_fkey'
             columns: ['session_id']
@@ -184,6 +194,33 @@ export type Database = {
             referencedColumns: ['id']
           }
         ]
+      }
+      out_checks: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          customer_name: string
+          customer_phone: string | null
+          id: string
+          status: 'open' | 'closed'
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          customer_name: string
+          customer_phone?: string | null
+          id?: string
+          status?: 'open' | 'closed'
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          customer_name?: string
+          customer_phone?: string | null
+          id?: string
+          status?: 'open' | 'closed'
+        }
+        Relationships: []
       }
       staff_profiles: {
         Row: {
@@ -327,7 +364,14 @@ export type Database = {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      close_out_check: {
+        Args: {
+          p_out_check_id: string
+        }
+        Returns: undefined
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }

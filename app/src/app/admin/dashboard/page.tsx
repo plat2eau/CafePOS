@@ -579,7 +579,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
         <div className="grid">
           <SectionCard>
             <p className="eyebrow">Sales mix</p>
-            <h2>Table vs out orders</h2>
+            <h2>Table vs out-check orders</h2>
             <p>Revenue and order volume split for selected-range non-cancelled business.</p>
 
             <div className="stack">
@@ -591,7 +591,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
                 </span>
               </SummaryRow>
               <SummaryRow>
-                <strong>Out orders</strong>
+                <strong>Out-check orders</strong>
                 <span>
                   {toPrice(dashboard.salesMix.outOrderSalesCents)} - {dashboard.salesMix.outOrderCount} orders -{' '}
                   {formatPercent(dashboard.salesMix.outOrderSalesCents, totalSalesCents)}

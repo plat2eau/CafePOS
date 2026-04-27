@@ -36,7 +36,7 @@ export default async function AdminSessionsPage() {
           <p className="eyebrow">Admin Ops</p>
           <h1>Active sessions</h1>
           <p className="lead">
-            Track active tables, follow incoming orders, and manage each occupied table directly from this live operations screen.
+            Track active tables and out checks, follow incoming orders, and manage live service from this operations screen.
           </p>
           <div className="toolbar md:flex-row">
             <Button asChild variant="secondary" size="form" className="md:w-auto">

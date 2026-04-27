@@ -43,7 +43,7 @@ function buildOrderNotice(order: AdminOrder): Notice {
     title: `${order.ordered_by_name || order.guest_name || 'Guest'} placed an order`,
     message: order.table_id
       ? `Table ${order.table_id} just placed a new order for ${toPrice(order.total_cents)}.`
-      : `A new out order was placed for ${toPrice(order.total_cents)}.`
+      : `A new order was added to an out check for ${toPrice(order.total_cents)}.`
   }
 }
 

@@ -270,6 +270,7 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 .metaPill {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   min-height: 38px;
   padding: 8px 12px;
   border: 1px solid var(--border);
@@ -294,6 +295,114 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   flex-direction: column-reverse;
   gap: 16px;
   width: 100%;
+}
+
+.activeOrdersHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.activeOrdersNav {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.activeOrdersNav button {
+  border-radius: 999px;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.activeOrdersCarousel {
+  margin-top: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.activeOrdersCarousel::-webkit-scrollbar {
+  display: none;
+}
+
+.activeOrdersCarouselTrack {
+  display: flex;
+  gap: 14px;
+  min-width: max-content;
+  padding-bottom: 4px;
+}
+
+.activeOrdersCarouselItem {
+  flex: 0 0 min(360px, calc(100vw - 48px));
+  scroll-snap-align: start;
+}
+
+.activeOrdersCarouselItem > * {
+  height: 100%;
+}
+
+.serviceCardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.serviceCardSurface {
+  position: relative;
+  overflow: hidden;
+  border-left-width: 4px;
+}
+
+.serviceCardBookmark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 28px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #111827;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.serviceCardBookmarkIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  fill: currentColor;
+}
+
+.serviceCardSurfaceTable {
+  border-left-color: #2563eb;
+  background:
+    radial-gradient(circle at top right, rgb(37 99 235 / 0.08), transparent 32%),
+    var(--card-bg-strong) !important;
+}
+
+.serviceCardSurfaceTable .serviceCardBookmark {
+  background: #dbeafe;
+}
+
+.serviceCardSurfaceOutCheck {
+  border-left-color: #dc2626;
+  background:
+    radial-gradient(circle at top right, rgb(220 38 38 / 0.08), transparent 32%),
+    var(--card-bg-strong) !important;
+}
+
+.serviceCardSurfaceOutCheck .serviceCardBookmark {
+  background: #fee2e2;
 }
 
 .orderLayout {
@@ -1796,6 +1905,14 @@ html[data-color-scheme='dark'] .menuFloatingNavigatorPill.isActive {
 }
 
 @media (min-width: 900px) {
+  .activeOrdersNav {
+    display: flex;
+  }
+
+  .serviceCardGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .menuSearchBarWrap {
     position: static;
   }

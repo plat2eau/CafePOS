@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Fragment } from 'react'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { EmptyStateCard, MetricCard, OrderCard, ServiceRequestCard } from '@/components/AppCards'
+import { EmptyStateCard, OrderCard, ServiceRequestCard } from '@/components/AppCards'
 import SearchBar from '@/components/SearchBar'
 import { ActionGroup } from '@/components/ui/action-group'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,7 @@ import type {
   AdminMenuCategory,
   AdminMenuItem,
   AdminOrder,
+  AdminOutCheck,
   AdminOverviewData,
   AdminTableOption
 } from '@/lib/admin-data'
@@ -145,12 +146,14 @@ export default function AdminConsole({
   const [data, setData] = useState(initialData)
   const [flash, setFlash] = useState<FlashState | null>(null)
   const [expandedTableId, setExpandedTableId] = useState<string | null>(null)
+  const [expandedOutCheckId, setExpandedOutCheckId] = useState<string | null>(null)
   const [isAddOrderDialogOpen, setIsAddOrderDialogOpen] = useState(false)
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
   const [orderType, setOrderType] = useState<OrderType>(tables.length > 0 ? 'table' : 'out')
   const [selectedTableId, setSelectedTableId] = useState(tables[0]?.id ?? '')
   const [customerName, setCustomerName] = useState('Guest')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [selectedOutCheckId, setSelectedOutCheckId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [note, setNote] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
@@ -162,10 +165,12 @@ export default function AdminConsole({
   const [isClearingTable, setIsClearingTable] = useState(false)
   const [isOpeningReceipt, setIsOpeningReceipt] = useState(false)
   const [discountPercentage, setDiscountPercentage] = useState('')
-  const [pendingReceiptOrderId, setPendingReceiptOrderId] = useState<string | null>(null)
-  const [pendingCloseOutOrderId, setPendingCloseOutOrderId] = useState<string | null>(null)
+  const [pendingReceiptOutCheckId, setPendingReceiptOutCheckId] = useState<string | null>(null)
+  const [closeTargetOutCheckId, setCloseTargetOutCheckId] = useState<string | null>(null)
+  const [isClosingOutCheck, setIsClosingOutCheck] = useState(false)
   const [pendingOrderItemIds, setPendingOrderItemIds] = useState<string[]>([])
   const [removeOrderItemTarget, setRemoveOrderItemTarget] = useState<RemoveOrderItemTarget | null>(null)
+  const activeOrdersCarouselRef = useRef<HTMLDivElement | null>(null)
   const adminMenuResultsRef = useRef<HTMLDivElement | null>(null)
   const adminNavigatorInnerRef = useRef<HTMLDivElement | null>(null)
   const lastNavigatorScrollIdRef = useRef<string | null>(null)
@@ -215,7 +220,24 @@ export default function AdminConsole({
       setClearTargetTableId(null)
       setDiscountPercentage('')
     }
-  }, [clearTargetTableId, data.sessions, expandedTableId])
+
+    if (selectedOutCheckId && !data.outChecks.some((outCheck) => outCheck.id === selectedOutCheckId)) {
+      setSelectedOutCheckId(null)
+      setCustomerName('Guest')
+      setCustomerPhone('')
+    }
+
+    if (expandedOutCheckId && !data.outChecks.some((outCheck) => outCheck.id === expandedOutCheckId)) {
+      setExpandedOutCheckId(null)
+    }
+  }, [
+    clearTargetTableId,
+    data.outChecks,
+    data.sessions,
+    expandedOutCheckId,
+    expandedTableId,
+    selectedOutCheckId
+  ])
 
   const ordersByTable = useMemo(() => {
     const map = new Map<string, AdminOrder[]>()
@@ -235,6 +257,11 @@ export default function AdminConsole({
 
     return map
   }, [data.orders])
+
+  const activeOrders = useMemo(
+    () => data.orders.filter((order) => order.status === 'placed' || order.status === 'preparing'),
+    [data.orders]
+  )
 
   const serviceRequestsByTable = useMemo(() => {
     const map = new Map<string, AdminOverviewData['serviceRequests']>()
@@ -381,9 +408,13 @@ export default function AdminConsole({
 
   const selectedSession = data.sessions.find((session) => session.table_id === selectedTableId) ?? null
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? null
+  const selectedOutCheck =
+    data.outChecks.find((outCheck) => outCheck.id === selectedOutCheckId) ?? null
   const clearTargetSession =
     data.sessions.find((session) => session.table_id === clearTargetTableId) ?? null
   const clearTargetOrders = clearTargetTableId ? ordersByTable.get(clearTargetTableId) ?? [] : []
+  const closeTargetOutCheck =
+    data.outChecks.find((outCheck) => outCheck.id === closeTargetOutCheckId) ?? null
   const searchSummary = normalizedSearchQuery
     ? `${filteredMenuItems.length} matching item${filteredMenuItems.length === 1 ? '' : 's'}`
     : `${menuItems.length} item${menuItems.length === 1 ? '' : 's'} available`
@@ -507,6 +538,7 @@ export default function AdminConsole({
     setNote('')
     setCustomerName('Guest')
     setCustomerPhone('')
+    setSelectedOutCheckId(null)
     setQuantities({})
     setCustomItems([])
     setCustomItemName('')
@@ -592,7 +624,7 @@ export default function AdminConsole({
     if (orderType === 'out' && !customerName.trim()) {
       setFlash({
         tone: 'error',
-        message: 'Enter a customer name for the out order.'
+        message: 'Enter a customer name for the out check.'
       })
       return
     }
@@ -618,6 +650,7 @@ export default function AdminConsole({
         body: JSON.stringify({
           orderType,
           tableId: orderType === 'table' ? selectedTableId : undefined,
+          outCheckId: orderType === 'out' ? selectedOutCheckId ?? undefined : undefined,
           customerName: orderType === 'out' ? customerName : undefined,
           customerPhone: orderType === 'out' ? customerPhone : undefined,
           note,
@@ -662,16 +695,39 @@ export default function AdminConsole({
     })
     setIsSubmittingOrder(false)
 
-    if (orderType === 'out' && payload?.receiptUrl) {
-      router.push(payload.receiptUrl)
-    }
   }
 
-  async function handleOpenOutOrderReceipt(orderId: string) {
-    setPendingReceiptOrderId(orderId)
+  function selectOutCheck(outCheckId: string | null) {
+    setSelectedOutCheckId(outCheckId)
+
+    if (!outCheckId) {
+      setCustomerName('Guest')
+      setCustomerPhone('')
+      return
+    }
+
+    const outCheck = data.outChecks.find((entry) => entry.id === outCheckId)
+    if (!outCheck) {
+      return
+    }
+
+    setCustomerName(outCheck.customer_name)
+    setCustomerPhone(outCheck.customer_phone ?? '')
+  }
+
+  function handleAddOutCheckOrder(outCheck: AdminOutCheck) {
+    resetOrderComposer()
+    setOrderType('out')
+    selectOutCheck(outCheck.id)
+    setFlash(null)
+    setIsAddOrderDialogOpen(true)
+  }
+
+  async function handleOpenOutCheckReceipt(outCheckId: string) {
+    setPendingReceiptOutCheckId(outCheckId)
 
     const result = await apiFetch<{ message?: string; receiptUrl?: string }>(
-      `/api/admin/orders/${orderId}/receipt-token`,
+      `/api/admin/out-checks/${outCheckId}/receipt-token`,
       {
         method: 'POST'
       },
@@ -688,24 +744,35 @@ export default function AdminConsole({
         tone: 'error',
         message: result.ok ? 'Could not open the receipt right now.' : result.message
       })
-      setPendingReceiptOrderId(null)
+      setPendingReceiptOutCheckId(null)
       return
     }
 
-    setPendingReceiptOrderId(null)
-    router.push(result.data.receiptUrl)
+    setPendingReceiptOutCheckId(null)
+    const receiptWindow = window.open(result.data.receiptUrl, '_blank')
+
+    if (!receiptWindow) {
+      setFlash({
+        tone: 'error',
+        message: 'Receipt page was blocked. Allow pop-ups and try again.'
+      })
+    }
   }
 
-  async function handleCloseOutOutOrder(orderId: string) {
+  async function handleCloseOutCheck() {
+    if (!closeTargetOutCheckId) {
+      return
+    }
+
     setFlash(null)
-    setPendingCloseOutOrderId(orderId)
+    setIsClosingOutCheck(true)
 
     const result = await apiFetch<{ message?: string }>(
-      `/api/admin/orders/${orderId}/close-out`,
+      `/api/admin/out-checks/${closeTargetOutCheckId}/close-out`,
       {
         method: 'POST'
       },
-      'Could not close out the order.'
+      'Could not close the out check.'
     )
 
     if (!result.ok) {
@@ -718,7 +785,7 @@ export default function AdminConsole({
         tone: 'error',
         message: result.message
       })
-      setPendingCloseOutOrderId(null)
+      setIsClosingOutCheck(false)
       return
     }
 
@@ -727,11 +794,12 @@ export default function AdminConsole({
       setData(nextData)
     }
 
+    setCloseTargetOutCheckId(null)
     setFlash({
       tone: 'success',
-      message: result.data?.message ?? 'Order closed out.'
+      message: result.data?.message ?? 'Out check closed.'
     })
-    setPendingCloseOutOrderId(null)
+    setIsClosingOutCheck(false)
   }
 
   async function handleOrderStatusChange(
@@ -1056,6 +1124,22 @@ export default function AdminConsole({
     setActiveMenuCategoryId(categoryId)
   }
 
+  function scrollActiveOrders(direction: 'previous' | 'next') {
+    const carousel = activeOrdersCarouselRef.current
+    if (!carousel) return
+
+    const firstItem = carousel.querySelector('.activeOrdersCarouselItem')
+    const itemWidth =
+      firstItem instanceof HTMLElement
+        ? firstItem.getBoundingClientRect().width
+        : 360
+
+    carousel.scrollBy({
+      left: direction === 'next' ? itemWidth + 14 : -(itemWidth + 14),
+      behavior: 'smooth'
+    })
+  }
+
   return (
     <div className="sectionStack">
       <ActionGroup>
@@ -1064,6 +1148,7 @@ export default function AdminConsole({
           className="md:w-auto"
           type="button"
           onClick={() => {
+            resetOrderComposer()
             setFlash(null)
             setIsAddOrderDialogOpen(true)
           }}
@@ -1074,42 +1159,50 @@ export default function AdminConsole({
 
       {flash ? <FlashMessage tone={flash.tone}>{flash.message}</FlashMessage> : null}
 
-      <div className="compactGrid">
-        <MetricCard
-          eyebrow="Active tables"
-          value={data.sessions.length}
-          description="Tables with an active guest session right now."
-        />
-        <MetricCard
-          eyebrow="Recent orders"
-          value={data.orders.length}
-          description="Orders visible in the admin console feed."
-        />
-        <MetricCard
-          eyebrow="Server calls"
-          value={data.serviceRequests.length}
-          description="Open payment or assistance requests from active tables."
-        />
-      </div>
-
-      <div className="responsiveSplit">
-        <SectionCard>
+      <SectionCard>
+        <div className="activeOrdersHeader">
+          <div>
           <p className="eyebrow">Live order feed</p>
-          <h2>Incoming orders</h2>
+          <h2>Active orders</h2>
           <p>Refreshes automatically every few seconds.</p>
+          </div>
+          {activeOrders.length > 0 ? (
+            <div className="activeOrdersNav" aria-label="Active order navigation">
+              <Button
+                variant="secondary"
+                size="icon"
+                type="button"
+                aria-label="Previous active orders"
+                onClick={() => scrollActiveOrders('previous')}
+              >
+                ‹
+              </Button>
+              <Button
+                variant="secondary"
+                size="icon"
+                type="button"
+                aria-label="Next active orders"
+                onClick={() => scrollActiveOrders('next')}
+              >
+                ›
+              </Button>
+            </div>
+          ) : null}
+        </div>
 
-          <div className="stack">
-            {data.orders.length === 0 ? (
-              <EmptyStateCard
-                eyebrow="Order queue"
-                title="No orders yet"
-                description="New table and out orders will appear here as they come in."
-              />
-            ) : (
-              data.orders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  title={order.table_id ? `Table ${order.table_id}` : 'Out order'}
+          {activeOrders.length === 0 ? (
+            <EmptyStateCard
+              eyebrow="Active order queue"
+              title="No active orders"
+              description="Placed and preparing table or out-check orders will appear here."
+            />
+          ) : (
+            <div className="activeOrdersCarousel" aria-label="Active orders" ref={activeOrdersCarouselRef}>
+              <div className="activeOrdersCarouselTrack">
+                {activeOrders.map((order) => (
+                  <div className="activeOrdersCarouselItem" key={order.id}>
+                    <OrderCard
+                  title={order.table_id ? `Table ${order.table_id}` : 'Out check'}
                   timestamp={formatTimestamp(order.created_at)}
                   summary={
                     <p>
@@ -1126,60 +1219,29 @@ export default function AdminConsole({
                   }))}
                   note={order.note}
                   total={toPrice(order.total_cents)}
-                  actions={
-                    <ActionGroup>
-                      {!order.table_id ? (
-                        <>
-                          <LoadingButton
-                            variant="secondary"
-                            size="form"
-                            className="md:w-auto"
-                            type="button"
-                            loading={pendingReceiptOrderId === order.id}
-                            loadingLabel="Opening receipt..."
-                            disabled={pendingReceiptOrderId !== null || pendingCloseOutOrderId !== null}
-                            onClick={() => void handleOpenOutOrderReceipt(order.id)}
-                          >
-                            Print receipt
-                          </LoadingButton>
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+      </SectionCard>
 
-                          <LoadingButton
-                            variant="default"
-                            size="form"
-                            className="md:w-auto"
-                            type="button"
-                            loading={pendingCloseOutOrderId === order.id}
-                            loadingLabel="Closing out..."
-                            disabled={pendingReceiptOrderId !== null || pendingCloseOutOrderId !== null}
-                            onClick={() => void handleCloseOutOutOrder(order.id)}
-                          >
-                            Close out
-                          </LoadingButton>
-                        </>
-                      ) : (
-                        ''
-                      )}
-                    </ActionGroup>
-                  }
-                />
-              ))
-            )}
-          </div>
-        </SectionCard>
-
+      <div className="responsiveSplit">
         <SectionCard tone="support" style={{ flexGrow: 1 }}>
-          <p className="eyebrow">Occupied tables</p>
+          <p className="eyebrow">Active service</p>
           <h2>Session overview</h2>
-          <div className="stack">
-            {data.sessions.length === 0 ? (
-              <EmptyStateCard
-                eyebrow="Sessions"
-                title="No active table sessions"
-                description="Occupied tables will appear here while guests are still checked in."
-                tone="support"
-              />
-            ) : (
-              data.sessions.map((session) => {
+          <p>Active table sessions and out checks are shown together for faster scanning.</p>
+          {data.sessions.length === 0 && data.outChecks.length === 0 ? (
+            <EmptyStateCard
+              eyebrow="Active service"
+              title="No active sessions or out checks"
+              description="Occupied tables and open out checks will appear here."
+              tone="support"
+            />
+          ) : (
+            <div className="serviceCardGrid">
+              {data.sessions.map((session) => {
                 const orderCount = ordersByTable.get(session.table_id)?.length ?? 0
                 const tableOrders = ordersByTable.get(session.table_id) ?? []
                 const tableServiceRequests = serviceRequestsByTable.get(session.table_id) ?? []
@@ -1191,17 +1253,27 @@ export default function AdminConsole({
                     key={session.id}
                     tone="support"
                     style={{ display: "flex", gap: "16px", flexDirection: "column" }}
-                    className="bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.08),transparent_32%),var(--card-bg-strong)]"
+                    className="serviceCardSurface serviceCardSurfaceTable bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.08),transparent_32%),var(--card-bg-strong)]"
                   >
+                    <span className="serviceCardBookmark">
+                      <svg
+                        aria-hidden="true"
+                        className="serviceCardBookmarkIcon"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M4 9h16v3H4V9Zm2 4h3v6H7v-4H6v4H4v-6h2Zm9 0h3v6h-2v-4h-1v4h-2v-6h2Z" />
+                      </svg>
+                      {tableLabel}
+                    </span>
                     <SummaryRow>
-                      <b>{tableLabel}</b>
+                      <b>{session.guest_name}</b>
                       <span>{orderCount} order{orderCount === 1 ? '' : 's'}</span>
                     </SummaryRow>
-                    <p>{session.guest_name}</p>
                     {session.guest_phone ? <p>{session.guest_phone}</p> : null}
                     <div className="metaPillRow">
                       <span className="metaPill">
-                        Session PIN <strong>{session.session_pin}</strong>
+                        <span>Session PIN</span>
+                        <strong>{session.session_pin}</strong>
                       </span>
                       <span className="metaPill">Last active {formatTimestamp(session.last_active_at)}</span>
                     </div>
@@ -1330,9 +1402,114 @@ export default function AdminConsole({
                     ) : null}
                   </SectionCard>
                 )
-              })
-            )}
-          </div>
+              })}
+              {data.outChecks.map((outCheck) => {
+              const outCheckTotal = outCheck.orders.reduce((sum, order) => sum + order.total_cents, 0)
+              const isExpanded = expandedOutCheckId === outCheck.id
+
+              return (
+                <SectionCard
+                  key={outCheck.id}
+                  tone="support"
+                  style={{ display: "flex", gap: "16px", flexDirection: "column" }}
+                  className="serviceCardSurface serviceCardSurfaceOutCheck bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.08),transparent_32%),var(--card-bg-strong)]"
+                >
+                  <span className="serviceCardBookmark">
+                    <svg
+                      aria-hidden="true"
+                      className="serviceCardBookmarkIcon"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M7 3h10v18l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2V3Zm3 5h6V6h-6v2Zm0 4h6v-2h-6v2Zm0 4h4v-2h-4v2Z" />
+                    </svg>
+                    Check {outCheck.id.slice(0, 8)}
+                  </span>
+                  <SummaryRow>
+                    <b>{outCheck.customer_name}</b>
+                    <span>{outCheck.orders.length} order{outCheck.orders.length === 1 ? '' : 's'}</span>
+                  </SummaryRow>
+                  <p>{outCheck.customer_phone || 'No phone number'}</p>
+                  <div className="metaPillRow">
+                    <span className="metaPill">Opened {formatTimestamp(outCheck.created_at)}</span>
+                    <span className="metaPill">
+                      <span>Check total</span>
+                      <strong>{toPrice(outCheckTotal)}</strong>
+                    </span>
+                  </div>
+                  <ActionGroup>
+                    <LoadingButton
+                      size="form"
+                      className="md:w-auto"
+                      type="button"
+                      loading={isClosingOutCheck && closeTargetOutCheckId === outCheck.id}
+                      loadingLabel="Closing out check..."
+                      disabled={isClosingOutCheck}
+                      onClick={() => setCloseTargetOutCheckId(outCheck.id)}
+                    >
+                      Close out check
+                    </LoadingButton>
+                    <Button
+                      variant="secondary"
+                      size="form"
+                      className="md:w-auto"
+                      type="button"
+                      onClick={() =>
+                        setExpandedOutCheckId((current) =>
+                          current === outCheck.id ? null : outCheck.id
+                        )
+                      }
+                    >
+                      {isExpanded ? 'Hide details' : 'View details'}
+                    </Button>
+                  </ActionGroup>
+                  {isExpanded ? (
+                    <div className="stack pt-2">
+                      <ActionGroup>
+                        <Button
+                          size="form"
+                          className="md:w-auto"
+                          type="button"
+                          onClick={() => handleAddOutCheckOrder(outCheck)}
+                        >
+                          Add order
+                        </Button>
+                        <LoadingButton
+                          variant="secondary"
+                          size="form"
+                          className="md:w-auto"
+                          type="button"
+                          loading={pendingReceiptOutCheckId === outCheck.id}
+                          loadingLabel="Opening receipt..."
+                          disabled={pendingReceiptOutCheckId !== null || isClosingOutCheck}
+                          onClick={() => void handleOpenOutCheckReceipt(outCheck.id)}
+                        >
+                          Print receipt
+                        </LoadingButton>
+                      </ActionGroup>
+                      {outCheck.orders.map((order) => (
+                        <OrderCard
+                          key={order.id}
+                          title={`Order ${order.id.slice(0, 8)}`}
+                          timestamp={formatTimestamp(order.created_at)}
+                          summary={<StatusBadge>{order.status}</StatusBadge>}
+                          items={order.items.map((item) => ({
+                            id: item.id,
+                            name: item.item_name,
+                            quantity: item.quantity,
+                            total: toPrice(item.line_total_cents),
+                            actions: renderOrderItemActions(order, item)
+                          }))}
+                          note={order.note}
+                          total={toPrice(order.total_cents)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </SectionCard>
+              )
+              })}
+            </div>
+          )}
         </SectionCard>
       </div>
 
@@ -1384,6 +1561,84 @@ export default function AdminConsole({
                 >
                   {removeOrderItemTarget.cancelsOrder ? 'Remove item and cancel order' : 'Remove item'}
                 </LoadingButton>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(closeTargetOutCheck)}
+        onOpenChange={(open) => {
+          if (!open && !isClosingOutCheck && pendingReceiptOutCheckId === null) {
+            setCloseTargetOutCheckId(null)
+          }
+        }}
+      >
+        <DialogContent
+          onEscapeKeyDown={(event) => {
+            if (isClosingOutCheck || pendingReceiptOutCheckId !== null) {
+              event.preventDefault()
+            }
+          }}
+          onInteractOutside={(event) => {
+            if (isClosingOutCheck || pendingReceiptOutCheckId !== null) {
+              event.preventDefault()
+            }
+          }}
+        >
+          {closeTargetOutCheck ? (
+            <>
+              <DialogHeader>
+                <p className="eyebrow">Close out check</p>
+                <DialogTitle>Open receipt before closing the out check?</DialogTitle>
+                <DialogDescription>
+                  Open the combined receipt first, then close the check after printing or sharing it.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="dialogSummary">
+                <SummaryRow>
+                  <span>Customer</span>
+                  <strong>{closeTargetOutCheck.customer_name}</strong>
+                </SummaryRow>
+                <SummaryRow>
+                  <span>Orders</span>
+                  <strong>{closeTargetOutCheck.orders.length}</strong>
+                </SummaryRow>
+                <SummaryRow variant="total">
+                  <span>Total</span>
+                  <strong>
+                    {toPrice(closeTargetOutCheck.orders.reduce((sum, order) => sum + order.total_cents, 0))}
+                  </strong>
+                </SummaryRow>
+              </div>
+              <DialogFooter>
+                <LoadingButton
+                  size="form"
+                  type="button"
+                  loading={pendingReceiptOutCheckId === closeTargetOutCheck.id}
+                  loadingLabel="Opening receipt..."
+                  disabled={isClosingOutCheck || pendingReceiptOutCheckId !== null}
+                  onClick={() => void handleOpenOutCheckReceipt(closeTargetOutCheck.id)}
+                >
+                  Open receipt
+                </LoadingButton>
+                <LoadingButton
+                  variant="secondary"
+                  size="form"
+                  type="button"
+                  loading={isClosingOutCheck}
+                  loadingLabel="Closing out check..."
+                  disabled={isClosingOutCheck}
+                  onClick={() => void handleCloseOutCheck()}
+                >
+                  Close out check
+                </LoadingButton>
+                <DialogClose asChild disabled={isClosingOutCheck || pendingReceiptOutCheckId !== null}>
+                  <Button variant="secondary" size="form" type="button">
+                    Cancel
+                  </Button>
+                </DialogClose>
               </DialogFooter>
             </>
           ) : null}
@@ -1512,7 +1767,7 @@ export default function AdminConsole({
             <p className="eyebrow">Admin Order</p>
             <DialogTitle id="admin-add-order-title">Add order</DialogTitle>
             <DialogDescription>
-              Choose whether this is a table order or an out order, then build the order.
+              Choose whether this is a table order or an out-check order, then build the order.
             </DialogDescription>
           </DialogHeader>
 
@@ -1527,8 +1782,11 @@ export default function AdminConsole({
                       name="admin-order-type"
                       value="table"
                       checked={orderType === 'table'}
-                      disabled={tables.length === 0}
-                      onChange={() => setOrderType('table')}
+                      disabled={tables.length === 0 || selectedOutCheckId !== null}
+                      onChange={() => {
+                        setSelectedOutCheckId(null)
+                        setOrderType('table')
+                      }}
                     />
                     <span>Table order</span>
                   </label>
@@ -1538,9 +1796,10 @@ export default function AdminConsole({
                       name="admin-order-type"
                       value="out"
                       checked={orderType === 'out'}
+                      disabled={selectedOutCheckId !== null}
                       onChange={() => setOrderType('out')}
                     />
-                    <span>Out order</span>
+                    <span>Out check</span>
                   </label>
                 </div>
               </div>
@@ -1570,6 +1829,29 @@ export default function AdminConsole({
               ) : (
                 <>
                   <div className="formField">
+                    <label htmlFor="admin-order-out-check">Out check</label>
+                    <select
+                      id="admin-order-out-check"
+                      name="admin-order-out-check"
+                      value={selectedOutCheckId ?? ''}
+                      onChange={(event) => selectOutCheck(event.target.value || null)}
+                    >
+                      <option value="">New out check</option>
+                      {data.outChecks.map((outCheck) => (
+                        <option key={outCheck.id} value={outCheck.id}>
+                          {outCheck.customer_name}
+                          {outCheck.customer_phone ? ` - ${outCheck.customer_phone}` : ''}
+                          {` - ${outCheck.orders.length} order${outCheck.orders.length === 1 ? '' : 's'}`}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="finePrint">
+                      {selectedOutCheck
+                        ? 'This order will be added to the selected open out check.'
+                        : 'A new out check will be created with this first order.'}
+                    </p>
+                  </div>
+                  <div className="formField">
                     <label htmlFor="admin-order-customer-name">Name</label>
                     <Input
                       id="admin-order-customer-name"
@@ -1577,6 +1859,7 @@ export default function AdminConsole({
                       type="text"
                       value={customerName}
                       onChange={(event) => setCustomerName(event.target.value)}
+                      disabled={selectedOutCheckId !== null}
                       required
                     />
                   </div>
@@ -1590,6 +1873,7 @@ export default function AdminConsole({
                       placeholder="Optional"
                       value={customerPhone}
                       onChange={(event) => setCustomerPhone(event.target.value)}
+                      disabled={selectedOutCheckId !== null}
                     />
                   </div>
                 </>
@@ -1713,8 +1997,14 @@ export default function AdminConsole({
               <div className="dialogSummary">
                 <SummaryRow>
                   <span>Order type</span>
-                  <strong>{orderType === 'table' ? 'Table order' : 'Out order'}</strong>
+                  <strong>{orderType === 'table' ? 'Table order' : 'Out check'}</strong>
                 </SummaryRow>
+                {orderType === 'out' ? (
+                  <SummaryRow>
+                    <span>Target</span>
+                    <strong>{selectedOutCheck ? 'Existing out check' : 'New out check'}</strong>
+                  </SummaryRow>
+                ) : null}
                 <SummaryRow>
                   <span>{orderType === 'table' ? 'Table' : 'Customer'}</span>
                   <strong>
@@ -1849,7 +2139,7 @@ export default function AdminConsole({
                   }
                   onClick={() => void handleCreateAdminOrder()}
                 >
-                  Create order
+                  {orderType === 'out' && selectedOutCheckId ? 'Add order to check' : 'Create order'}
                 </LoadingButton>
               </DialogFooter>
             </div>

@@ -49,7 +49,7 @@ function getCustomerPhone(order: AdminDashboardOrderDetail) {
 }
 
 function getOrderLocation(order: AdminDashboardOrderDetail) {
-  return order.tableId ? `Table ${order.tableId}` : 'Out order'
+  return order.tableId ? `Table ${order.tableId}` : 'Out check'
 }
 
 function getItemCount(order: AdminDashboardOrderDetail) {
@@ -90,7 +90,7 @@ export default function AdminDashboardOrdersDialog({
           <h2>Orders in selected range</h2>
           <p>
             Open a popup with expandable order cards for {rangeLabel}. Each card starts with the date,
-            amount, person, and table/out order type.
+            amount, person, and table/out-check order type.
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>

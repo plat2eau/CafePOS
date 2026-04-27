@@ -52,7 +52,13 @@ export async function getSchemaReadinessReport(): Promise<SchemaReadinessReport>
     runCheck('orders_archive', 'Orders archive schema', () =>
       supabase
         .from('orders')
-        .select('id, table_id, session_id, status, archived_at')
+        .select('id, table_id, session_id, out_check_id, status, archived_at')
+        .limit(1)
+    ),
+    runCheck('out_checks', 'Out checks schema', () =>
+      supabase
+        .from('out_checks')
+        .select('id, customer_name, customer_phone, status, closed_at')
         .limit(1)
     ),
     runCheck('staff_profiles', 'Admin staff profile schema', () =>

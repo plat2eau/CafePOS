@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminAuthContext } from '@/lib/admin-auth'
 import { apiError, logApiError, unauthorizedApiError } from '@/lib/api-errors'
-import { createReceiptToken } from '@/lib/receipt-print-server'
-import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { AdminOrder } from '@/lib/admin-data'
 
 type RequestedOrderItem = {
   itemId?: string
@@ -23,6 +20,14 @@ function normalizePhone(value: string) {
   return value.trim()
 }
 
+function isMissingOutChecksSchema(errorMessage: string) {
+  return (
+    errorMessage.includes('out_checks') ||
+    errorMessage.includes('out_check_id') ||
+    errorMessage.includes('orders_exactly_one_workflow_chk')
+  )
+}
+
 export async function POST(request: Request) {
   const auth = await getAdminAuthContext()
 
@@ -34,6 +39,7 @@ export async function POST(request: Request) {
     | {
       orderType?: 'table' | 'out'
       tableId?: string
+      outCheckId?: string
       customerName?: string
       customerPhone?: string
       items?: RequestedOrderItem[]
@@ -44,6 +50,7 @@ export async function POST(request: Request) {
 
   const orderType = body?.orderType === 'out' ? 'out' : 'table'
   const tableId = body?.tableId?.trim()
+  const requestedOutCheckId = body?.outCheckId?.trim()
   const customerName = body?.customerName?.trim() ?? ''
   const customerPhone = normalizePhone(body?.customerPhone ?? '')
   const note = body?.note?.trim() || null
@@ -77,8 +84,8 @@ export async function POST(request: Request) {
     return apiError('Choose a table first.', 400, { code: 'table_required' })
   }
 
-  if (orderType === 'out' && !customerName) {
-    return apiError('Enter a customer name for the out order.', 400, {
+  if (orderType === 'out' && !requestedOutCheckId && !customerName) {
+    return apiError('Enter a customer name for the out check.', 400, {
       code: 'customer_name_required'
     })
   }
@@ -90,6 +97,10 @@ export async function POST(request: Request) {
   const supabase = createServerSupabaseClient()
   let activeSessionId: string | null = null
   let createdSession = false
+  let activeOutCheckId: string | null = null
+  let createdOutCheck = false
+  let outCheckCustomerName = customerName
+  let outCheckCustomerPhone = customerPhone
 
   if (orderType === 'table') {
     const tableIdForOrder = tableId as string
@@ -180,6 +191,30 @@ export async function POST(request: Request) {
         createdSession = true
       }
     }
+  }
+
+  if (orderType === 'out' && requestedOutCheckId) {
+    const { data: outCheck, error: outCheckError } = await supabase
+      .from('out_checks')
+      .select('id, customer_name, customer_phone, status')
+      .eq('id', requestedOutCheckId)
+      .maybeSingle()
+
+    if (outCheckError || !outCheck) {
+      return apiError('That out check could not be found.', 404, {
+        code: 'out_check_not_found',
+        context: 'admin.orders.post.outCheck',
+        cause: outCheckError
+      })
+    }
+
+    if (outCheck.status !== 'open') {
+      return apiError('That out check is already closed.', 400, { code: 'out_check_closed' })
+    }
+
+    activeOutCheckId = outCheck.id
+    outCheckCustomerName = outCheck.customer_name
+    outCheckCustomerPhone = outCheck.customer_phone ?? ''
   }
 
   let totalCents = 0
@@ -282,24 +317,77 @@ export async function POST(request: Request) {
       })
     }
 
+    if (orderType === 'out' && !activeOutCheckId) {
+      const { data: outCheck, error: outCheckError } = await supabase
+        .from('out_checks')
+        .insert({
+          customer_name: outCheckCustomerName,
+          customer_phone: outCheckCustomerPhone || null
+        })
+        .select('id')
+        .single()
+
+      if (outCheckError || !outCheck) {
+        const outCheckErrorMessage = outCheckError?.message?.toLowerCase() ?? ''
+
+        if (isMissingOutChecksSchema(outCheckErrorMessage)) {
+          return apiError(
+            'The database is missing the out-check schema. Apply migration 0012_add_out_checks.sql and try again.',
+            500,
+            {
+              code: 'database_migration_required',
+              context: 'admin.orders.post.createOutCheck',
+              cause: outCheckError
+            }
+          )
+        }
+
+        return apiError('Could not create the out check.', 500, {
+          code: 'out_check_create_failed',
+          context: 'admin.orders.post.createOutCheck',
+          cause: outCheckError
+        })
+      }
+
+      activeOutCheckId = outCheck.id
+      createdOutCheck = true
+    }
+
     const { data: createdOrder, error: orderError } = await supabase
       .from('orders')
       .insert({
         order_type: orderType,
         session_id: orderType === 'table' ? activeSessionId : null,
         table_id: orderType === 'table' ? tableId : null,
-        ordered_by_name: orderType === 'table' ? 'Admin' : customerName,
-        ordered_by_phone: orderType === 'table' ? '' : customerPhone,
+        out_check_id: orderType === 'out' ? activeOutCheckId : null,
+        ordered_by_name: orderType === 'table' ? 'Admin' : outCheckCustomerName,
+        ordered_by_phone: orderType === 'table' ? '' : outCheckCustomerPhone,
         note,
         total_cents: totalCents
       })
       .select(
-        'id, table_id, created_at, status, note, total_cents, session_id, ordered_by_name, ordered_by_phone'
+        'id, table_id, out_check_id, created_at, status, note, total_cents, session_id, ordered_by_name, ordered_by_phone'
       )
       .single()
 
     if (orderError || !createdOrder) {
+      if (createdOutCheck && activeOutCheckId) {
+        await supabase.from('out_checks').delete().eq('id', activeOutCheckId)
+      }
+
       const orderErrorMessage = orderError?.message?.toLowerCase() ?? ''
+
+      if (orderType === 'out' && isMissingOutChecksSchema(orderErrorMessage)) {
+        return apiError(
+          'The database is missing the out-check schema. Apply migration 0012_add_out_checks.sql and try again.',
+          500,
+          {
+            code: 'database_migration_required',
+            context: 'admin.orders.post.createOrder',
+            cause: orderError
+          }
+        )
+      }
 
       if (
         orderType === 'out' &&
@@ -336,6 +424,10 @@ export async function POST(request: Request) {
         logApiError('admin.orders.post.cleanupOrderAfterItemsFailure', cleanupError)
       }
 
+      if (createdOutCheck && activeOutCheckId) {
+        await supabase.from('out_checks').delete().eq('id', activeOutCheckId)
+      }
+
       return apiError('Could not save the order items.', 500, {
         code: 'order_items_create_failed',
         context: 'admin.orders.post.createOrderItems',
@@ -343,40 +435,11 @@ export async function POST(request: Request) {
       })
     }
 
-    if (orderType === 'out') {
-      const receiptPayload = buildReceiptPayloadForOrders({
-        guestName: customerName,
-        orders: [
-          {
-            ...(createdOrder as Omit<AdminOrder, 'items' | 'guest_name'>),
-            guest_name: null,
-            items: normalizedOrderItems.map((item, index) => ({
-              id: `preview-${index}`,
-              menu_item_id: item.menu_item_id,
-              item_name: item.item_name,
-              portion: item.portion,
-              quantity: item.quantity,
-              unit_price_cents: item.unit_price_cents,
-              line_total_cents: item.line_total_cents
-            }))
-          }
-        ]
-      })
-
-      const token = createReceiptToken(receiptPayload)
-      const receiptUrl = new URL('/print/receipt', request.url)
-      receiptUrl.searchParams.set('token', token)
-
-      revalidatePath('/admin/sessions')
-      revalidatePath('/api/admin/overview')
-
-      return NextResponse.json({
-        ok: true,
-        message: 'Out order created.',
-        receiptUrl: receiptUrl.toString()
-      })
-    }
   } catch (error) {
+    if (createdOutCheck && activeOutCheckId) {
+      await supabase.from('out_checks').delete().eq('id', activeOutCheckId)
+    }
+
     return apiError('One or more selected items are unavailable.', 400, {
       code: 'order_item_unavailable',
       context: 'admin.orders.post.normalizeItems',
@@ -406,9 +469,14 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    outCheckId: activeOutCheckId,
     message:
-      createdSession
-        ? 'Admin order created and guest session started.'
-        : 'Admin order created.'
+      orderType === 'out'
+        ? createdOutCheck
+          ? 'Out check created.'
+          : 'Order added to out check.'
+        : createdSession
+          ? 'Admin order created and guest session started.'
+          : 'Admin order created.'
   })
 }

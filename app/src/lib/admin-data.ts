@@ -26,6 +26,7 @@ export type AdminOrderItem = {
 export type AdminOrder = {
   id: string
   table_id: string | null
+  out_check_id: string | null
   created_at: string
   status: 'placed' | 'preparing' | 'served' | 'cancelled'
   note: string | null
@@ -35,6 +36,14 @@ export type AdminOrder = {
   ordered_by_name: string
   ordered_by_phone: string
   items: AdminOrderItem[]
+}
+
+export type AdminOutCheck = {
+  id: string
+  customer_name: string
+  customer_phone: string | null
+  created_at: string
+  orders: AdminOrder[]
 }
 
 export type AdminServiceRequest = {
@@ -77,6 +86,7 @@ export type AdminTableOption = Pick<
 export type AdminOverviewData = {
   generatedAt: string
   sessions: AdminSession[]
+  outChecks: AdminOutCheck[]
   orders: AdminOrder[]
   serviceRequests: AdminServiceRequest[]
 }
@@ -326,14 +336,16 @@ async function fetchOrdersWithItems(options?: {
   tableId?: string
   sessionId?: string
   sessionIds?: string[]
+  outCheckIds?: string[]
+  limit?: number
 }) {
   const supabase = createServerSupabaseClient()
   const ordersQuery = supabase
     .from('orders')
-    .select('id, table_id, created_at, status, note, total_cents, session_id, ordered_by_name, ordered_by_phone')
+    .select('id, table_id, out_check_id, created_at, status, note, total_cents, session_id, ordered_by_name, ordered_by_phone')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
-    .limit(20)
+    .limit(options?.limit ?? 20)
 
   const filteredQuery = options?.tableId
     ? ordersQuery.eq('table_id', options.tableId)
@@ -342,6 +354,10 @@ async function fetchOrdersWithItems(options?: {
     : options?.sessionIds
       ? options.sessionIds.length > 0
         ? ordersQuery.in('session_id', options.sessionIds)
+        : null
+    : options?.outCheckIds
+      ? options.outCheckIds.length > 0
+        ? ordersQuery.in('out_check_id', options.outCheckIds)
         : null
       : ordersQuery
 
@@ -412,11 +428,19 @@ async function fetchOrdersWithItems(options?: {
 
 export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   const supabase = createServerSupabaseClient()
-  const { data: sessions, error: sessionsError } = await supabase
-    .from('table_sessions')
-    .select('id, table_id, guest_name, guest_phone, started_at, last_active_at, session_pin')
-    .eq('status', 'active')
-    .order('last_active_at', { ascending: false })
+  const [{ data: sessions, error: sessionsError }, { data: outChecks, error: outChecksError }] =
+    await Promise.all([
+      supabase
+        .from('table_sessions')
+        .select('id, table_id, guest_name, guest_phone, started_at, last_active_at, session_pin')
+        .eq('status', 'active')
+        .order('last_active_at', { ascending: false }),
+      supabase
+        .from('out_checks')
+        .select('id, customer_name, customer_phone, created_at')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+    ])
 
   if (sessionsError) {
     throwDataLoadError(
@@ -426,8 +450,16 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     )
   }
 
+  if (outChecksError) {
+    throw new Error('Could not load open out checks.')
+  }
+
   const activeSessionIds = (sessions ?? []).map((session) => session.id)
   const orders = await fetchOrdersWithItems()
+  const openOutCheckOrders = await fetchOrdersWithItems({
+    outCheckIds: (outChecks ?? []).map((outCheck) => outCheck.id),
+    limit: 1000
+  })
   const { data: serviceRequests, error: serviceRequestsError } = activeSessionIds.length
     ? await supabase
         .from('service_requests')
@@ -451,6 +483,10 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
   return {
     generatedAt: new Date().toISOString(),
     sessions: sessions ?? [],
+    outChecks: (outChecks ?? []).map((outCheck) => ({
+      ...outCheck,
+      orders: openOutCheckOrders.filter((order) => order.out_check_id === outCheck.id)
+    })),
     orders,
     serviceRequests: (serviceRequests ?? []).map((request) => ({
       ...request,
@@ -476,7 +512,7 @@ export async function getAdminDashboardData(options?: {
     supabase
       .from('orders')
       .select(
-        'id, table_id, session_id, status, note, total_cents, created_at, ordered_by_name, ordered_by_phone'
+        'id, table_id, session_id, out_check_id, status, note, total_cents, created_at, ordered_by_name, ordered_by_phone'
       )
       .gte('created_at', range.startAt)
       .lt('created_at', range.endAt)
