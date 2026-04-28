@@ -886,14 +886,16 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 .receiptItemsTable th:nth-child(2),
 .receiptItemsTable td:nth-child(2) {
   width: 52px;
-  text-align: center;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .receiptItemsTable th:nth-child(3),
 .receiptItemsTable td:nth-child(3) {
-  width: 92px;
+  width: 108px;
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .receiptNote {
@@ -927,7 +929,7 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 }
 
 .receiptQrImage {
-  width: min(220px, 100%);
+  width: min(260px, 100%);
   height: auto;
 }
 
