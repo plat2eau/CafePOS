@@ -312,7 +312,9 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
     }
   )
 
-  return Object.fromEntries(lines.map((line, index) => [String(index), line]))
+  return Object.fromEntries(
+    lines.map((line, index) => [index.toString().padStart(4, '0'), line])
+  )
 }
 
 export function isReceiptPayload(value: unknown): value is ReceiptPayload {
