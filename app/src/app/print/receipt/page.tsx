@@ -32,7 +32,7 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
   const responsePath = `/api/print/receipt?token=${encodeURIComponent(token)}`
   const qrCodeDataUrl = await QRCode.toDataURL(buildReceiptQrValue(payload), {
     margin: 1,
-    width: 180
+    width: 240
   })
 
   return (
@@ -123,8 +123,8 @@ export default async function ReceiptPage({ searchParams }: ReceiptPageProps) {
               src={qrCodeDataUrl}
               alt="Receipt QR code"
               className="receiptQrImage"
-              width={180}
-              height={180}
+              width={240}
+              height={240}
               unoptimized
             />
           </div>

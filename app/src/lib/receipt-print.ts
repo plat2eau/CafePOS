@@ -49,6 +49,10 @@ export function toReceiptPrice(priceCents: number) {
   }).format(priceCents / 100)
 }
 
+function toReceiptAmountColumn(priceCents: number) {
+  return (priceCents / 100).toFixed(2)
+}
+
 export function formatReceiptTimestamp(value: string) {
   return new Intl.DateTimeFormat('en-IN', {
     timeZone: 'Asia/Kolkata',
@@ -134,6 +138,10 @@ export function buildReceiptPayloadForOrders({
 export function buildBluetoothPrintJson(payload: ReceiptPayload) {
   const separator = '--------------------------------'
   const qrValue = buildReceiptQrValue(payload)
+  const itemNameColumnWidth = 16
+  const quantityColumnWidth = 4
+  const amountColumnWidth = 9
+  const headerRow = `${'Item'.padEnd(itemNameColumnWidth)} ${'Qty'.padStart(quantityColumnWidth)} ${'Price'.padStart(amountColumnWidth)}`
   const lines: Array<Record<string, number | string>> = [
     {
       type: 0,
@@ -204,19 +212,21 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
 
     lines.push({
       type: 0,
-      content: 'Item            Qty      Price',
+      content: headerRow,
       bold: 1,
       align: 0,
-      format: 4
+      format: 0
     })
 
     for (const item of order.items) {
       const truncatedName =
-        item.name.length > 14 ? `${item.name.slice(0, 13).trimEnd()}.` : item.name
+        item.name.length > itemNameColumnWidth
+          ? `${item.name.slice(0, itemNameColumnWidth - 1).trimEnd()}.`
+          : item.name
 
       lines.push({
         type: 0,
-        content: `${truncatedName.padEnd(14)}${String(item.quantity).padStart(5)}${toReceiptPrice(item.lineTotalCents).padStart(11)}`,
+        content: `${truncatedName.padEnd(itemNameColumnWidth)} ${String(item.quantity).padStart(quantityColumnWidth)} ${toReceiptAmountColumn(item.lineTotalCents).padStart(amountColumnWidth)}`,
         bold: 0,
         align: 0,
         format: 0
@@ -293,7 +303,7 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
     {
       type: 3,
       value: qrValue,
-      size: 30,
+      size: 225,
       align: 1
     },
     {
