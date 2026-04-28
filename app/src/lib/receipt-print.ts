@@ -328,7 +328,7 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
     {
       type: 3,
       value: qrValue,
-      size: 100,
+      size: 250,
       align: 1
     },
     {
