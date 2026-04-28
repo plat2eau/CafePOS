@@ -49,6 +49,26 @@ export function toReceiptPrice(priceCents: number) {
   }).format(priceCents / 100)
 }
 
+function toReceiptAmountColumn(priceCents: number) {
+  return (priceCents / 100).toFixed(2)
+}
+
+function toReceiptItemRow(
+  itemName: string,
+  quantity: string,
+  amount: string,
+  itemNameColumnWidth: number,
+  quantityColumnWidth: number,
+  amountColumnWidth: number
+) {
+  const truncatedName =
+    itemName.length > itemNameColumnWidth
+      ? `${itemName.slice(0, itemNameColumnWidth - 1).trimEnd()}.`
+      : itemName
+
+  return `${truncatedName.padEnd(itemNameColumnWidth)} ${quantity.padStart(quantityColumnWidth)} ${amount.padStart(amountColumnWidth)}`
+}
+
 export function formatReceiptTimestamp(value: string) {
   return new Intl.DateTimeFormat('en-IN', {
     timeZone: 'Asia/Kolkata',
@@ -134,6 +154,17 @@ export function buildReceiptPayloadForOrders({
 export function buildBluetoothPrintJson(payload: ReceiptPayload) {
   const separator = '--------------------------------'
   const qrValue = buildReceiptQrValue(payload)
+  const itemNameColumnWidth = 16
+  const quantityColumnWidth = 4
+  const amountColumnWidth = 9
+  const headerRow = toReceiptItemRow(
+    'Item',
+    'Qty',
+    'Price',
+    itemNameColumnWidth,
+    quantityColumnWidth,
+    amountColumnWidth
+  )
   const lines: Array<Record<string, number | string>> = [
     {
       type: 0,
@@ -204,19 +235,23 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
 
     lines.push({
       type: 0,
-      content: 'Item            Qty      Price',
+      content: headerRow,
       bold: 1,
       align: 0,
-      format: 4
+      format: 0
     })
 
     for (const item of order.items) {
-      const truncatedName =
-        item.name.length > 14 ? `${item.name.slice(0, 13).trimEnd()}.` : item.name
-
       lines.push({
         type: 0,
-        content: `${truncatedName.padEnd(14)}${String(item.quantity).padStart(5)}${toReceiptPrice(item.lineTotalCents).padStart(11)}`,
+        content: toReceiptItemRow(
+          item.name,
+          String(item.quantity),
+          toReceiptAmountColumn(item.lineTotalCents),
+          itemNameColumnWidth,
+          quantityColumnWidth,
+          amountColumnWidth
+        ),
         bold: 0,
         align: 0,
         format: 0
@@ -293,7 +328,7 @@ export function buildBluetoothPrintJson(payload: ReceiptPayload) {
     {
       type: 3,
       value: qrValue,
-      size: 30,
+      size: 225,
       align: 1
     },
     {
