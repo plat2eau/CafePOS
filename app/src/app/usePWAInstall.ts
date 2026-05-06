@@ -1,37 +1,20 @@
-"use client";
+import { MetadataRoute } from 'next'
 
-import { useEffect, useState } from "react";
-
-let deferredPrompt: any = null;
-
-export function usePWAInstall() {
-  const [isInstallable, setIsInstallable] = useState(false);
-
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault(); // stop auto prompt
-      deferredPrompt = e;
-      setIsInstallable(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
-    };
-  }, []);
-
-  const install = async () => {
-    if (!deferredPrompt) return null;
-
-    deferredPrompt.prompt();
-
-    const choice = await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    setIsInstallable(false);
-
-    return choice.outcome; // "accepted" | "dismissed"
-  };
-
-  return { isInstallable, install };
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "Cheekoo's Admin",
+    short_name: "Cheekoo's",
+    description: "Admin management portal for Cheekoo",
+    start_url: "/admin/login",
+    display: "standalone",
+    background_color: "#ffffff",
+    theme_color: "#000000",
+    icons: [
+      {
+        src: "/cheekoo-dark.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+    ],
+  }
 }

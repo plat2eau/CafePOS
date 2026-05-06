@@ -3,6 +3,7 @@ import AdminSessionHeartbeat from '@/components/AdminSessionHeartbeat'
 import AdminLogoutButton from '@/components/AdminLogoutButton'
 import AdminConsole from '@/components/AdminConsole'
 import { Button } from '@/components/ui/button'
+import manifest from '@/app/usePWAInstall'
 import { requireAdminAuth } from '@/lib/admin-auth'
 import {
   getAdminMenuCategories,
@@ -10,7 +11,6 @@ import {
   getAdminOverviewData,
   getAdminTableOptions
 } from '@/lib/admin-data'
-import AdminPWAInstall from '@/components/AdminPWAInstall'
 
 export default async function AdminSessionsPage() {
   const [auth, initialData, menuCategories, menuItems, tables] = await Promise.all([
@@ -26,7 +26,6 @@ export default async function AdminSessionsPage() {
       <link rel="manifest" href="/manifest.json" />
       <section className="hero heroShell adminSessionsShell">
         <AdminSessionHeartbeat />
-        <AdminPWAInstall />
         <div className="adminSessionsTopAction">
           <AdminLogoutButton />
         </div>
