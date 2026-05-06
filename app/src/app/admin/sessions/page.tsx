@@ -23,6 +23,7 @@ export default async function AdminSessionsPage() {
 
   return (
     <main>
+      <link rel="manifest" href="/manifest.json" />
       <section className="hero heroShell adminSessionsShell">
         <AdminSessionHeartbeat />
         <AdminPWAInstall />
