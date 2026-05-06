@@ -1,7 +1,6 @@
 'use client'
 
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 
@@ -42,7 +41,7 @@ export default function SearchBar({
         </div>
       </div>
 
-      {/* {summary ? <p className="searchBarSummary">{summary}</p> : null} */}
+      {summary ? <p className="searchBarSummary">{summary}</p> : null}
       {children ? <div className="searchBarExtras">{children}</div> : null}
     </div>
   )

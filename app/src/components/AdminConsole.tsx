@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { Fragment } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmptyStateCard, MetricCard, OrderCard, ServiceRequestCard } from '@/components/AppCards'
 import SearchBar from '@/components/SearchBar'
@@ -24,8 +25,10 @@ import { SectionCard } from '@/components/ui/section-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { SummaryRow } from '@/components/ui/summary-row'
 import { Textarea } from '@/components/ui/textarea'
+import { searchMenuItems } from '@/lib/menu-search'
 import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
 import type {
+  AdminMenuCategory,
   AdminMenuItem,
   AdminOrder,
   AdminOverviewData,
@@ -35,6 +38,7 @@ import type { Database } from '@/lib/database.types'
 
 type AdminConsoleProps = {
   initialData: AdminOverviewData
+  menuCategories: AdminMenuCategory[]
   menuItems: AdminMenuItem[]
   tables: AdminTableOption[]
 }
@@ -126,7 +130,12 @@ async function fetchOverviewData() {
   return (await response.json()) as AdminOverviewData
 }
 
-export default function AdminConsole({ initialData, menuItems, tables }: AdminConsoleProps) {
+export default function AdminConsole({
+  initialData,
+  menuCategories,
+  menuItems,
+  tables
+}: AdminConsoleProps) {
   const router = useRouter()
   const [data, setData] = useState(initialData)
   const [flash, setFlash] = useState<FlashState | null>(null)
@@ -152,8 +161,15 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   const [pendingCloseOutOrderId, setPendingCloseOutOrderId] = useState<string | null>(null)
   const [pendingOrderItemIds, setPendingOrderItemIds] = useState<string[]>([])
   const [removeOrderItemTarget, setRemoveOrderItemTarget] = useState<RemoveOrderItemTarget | null>(null)
+  const adminMenuResultsRef = useRef<HTMLDivElement | null>(null)
+  const adminNavigatorInnerRef = useRef<HTMLDivElement | null>(null)
+  const lastNavigatorScrollIdRef = useRef<string | null>(null)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
+  const categoryNameById = useMemo(
+    () => new Map(menuCategories.map((category) => [category.id, category.name])),
+    [menuCategories]
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -236,15 +252,43 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   )
 
   const filteredMenuItems = useMemo(() => {
-    if (!normalizedSearchQuery) {
-      return menuItems
+    return searchMenuItems(menuItems, deferredSearchQuery, categoryNameById)
+  }, [categoryNameById, deferredSearchQuery, menuItems])
+
+  const filteredMenuCategoryIds = useMemo(
+    () => new Set(filteredMenuItems.map((item) => item.category_id)),
+    [filteredMenuItems]
+  )
+
+  const menuCategorySections = useMemo(
+    () =>
+      menuCategories
+        .filter((category) => filteredMenuCategoryIds.has(category.id))
+        .map((category) => ({
+          ...category,
+          anchorId: `admin-menu-category-${category.id}`
+        })),
+    [filteredMenuCategoryIds, menuCategories]
+  )
+
+  const filteredMenuItemsByCategory = useMemo(() => {
+    const map = new Map<string, AdminMenuItem[]>(
+      menuCategorySections.map((category) => [category.id, []])
+    )
+
+    for (const item of filteredMenuItems) {
+      const list = map.get(item.category_id)
+      if (list) {
+        list.push(item)
+      } else {
+        map.set(item.category_id, [item])
+      }
     }
 
-    return menuItems.filter((item) => {
-      const haystack = `${item.name} ${item.description ?? ''}`.toLowerCase()
-      return haystack.includes(normalizedSearchQuery)
-    })
-  }, [menuItems, normalizedSearchQuery])
+    return map
+  }, [filteredMenuItems, menuCategorySections])
+
+  const [activeMenuCategoryId, setActiveMenuCategoryId] = useState(menuCategorySections[0]?.id ?? '')
 
   const selectedItems = useMemo(
     () =>
@@ -341,6 +385,99 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
   const isRemovingOrderItem = removeOrderItemTarget
     ? pendingOrderItemIds.includes(removeOrderItemTarget.itemId)
     : false
+
+  useEffect(() => {
+    if (!menuCategorySections.length) {
+      setActiveMenuCategoryId('')
+      return
+    }
+
+    setActiveMenuCategoryId((current) =>
+      menuCategorySections.some((category) => category.id === current)
+        ? current
+        : menuCategorySections[0].id
+    )
+  }, [menuCategorySections])
+
+  useEffect(() => {
+    if (!isAddOrderDialogOpen) {
+      lastNavigatorScrollIdRef.current = null
+      return
+    }
+
+    const container = adminMenuResultsRef.current
+    if (!container || menuCategorySections.length < 2) {
+      return
+    }
+
+    let rafId: number | null = null
+
+    const updateActiveCategory = () => {
+      rafId = null
+
+      const containerTop = container.getBoundingClientRect().top
+      let bestId: string | null = null
+      let bestTop = Number.NEGATIVE_INFINITY
+      let closestPositiveId: string | null = null
+      let closestPositiveTop = Number.POSITIVE_INFINITY
+
+      for (const category of menuCategorySections) {
+        const element = document.getElementById(category.anchorId)
+        if (!(element instanceof HTMLElement)) {
+          continue
+        }
+
+        const top = element.getBoundingClientRect().top - containerTop
+
+        if (top <= 16 && top > bestTop) {
+          bestTop = top
+          bestId = category.id
+        } else if (top > 16 && top < closestPositiveTop) {
+          closestPositiveTop = top
+          closestPositiveId = category.id
+        }
+      }
+
+      const nextId = bestId ?? closestPositiveId ?? menuCategorySections[0]?.id ?? ''
+      if (nextId && nextId !== activeMenuCategoryId) {
+        setActiveMenuCategoryId(nextId)
+      }
+    }
+
+    const handleScroll = () => {
+      if (rafId !== null) return
+      rafId = window.requestAnimationFrame(updateActiveCategory)
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId)
+      }
+    }
+  }, [activeMenuCategoryId, isAddOrderDialogOpen, menuCategorySections])
+
+  useEffect(() => {
+    if (!isAddOrderDialogOpen) return
+    if (menuCategorySections.length < 2) return
+    if (!activeMenuCategoryId) return
+
+    const container = adminNavigatorInnerRef.current
+    if (!container) return
+
+    if (lastNavigatorScrollIdRef.current === activeMenuCategoryId) return
+
+    const pill = container.querySelector(
+      `[data-category-id="${activeMenuCategoryId}"]`
+    ) as HTMLElement | null
+    if (!pill) return
+
+    lastNavigatorScrollIdRef.current = activeMenuCategoryId
+    pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }, [activeMenuCategoryId, isAddOrderDialogOpen, menuCategorySections.length])
 
   function adjustQuantity(itemId: string, delta: number, portion?: Portion | null) {
     setQuantities((current) => {
@@ -952,6 +1089,25 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
     )
   }
 
+  function jumpToAdminMenuCategory(categoryId: string, anchorId: string) {
+    const container = adminMenuResultsRef.current
+    const element = document.getElementById(anchorId)
+
+    if (!(container instanceof HTMLElement) || !(element instanceof HTMLElement)) {
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    const elementRect = element.getBoundingClientRect()
+    const nextTop = container.scrollTop + (elementRect.top - containerRect.top) - 12
+
+    container.scrollTo({
+      top: Math.max(0, nextTop),
+      behavior: 'smooth'
+    })
+    setActiveMenuCategoryId(categoryId)
+  }
+
   return (
     <div className="sectionStack">
       <ActionGroup>
@@ -1495,70 +1651,111 @@ export default function AdminConsole({ initialData, menuItems, tables }: AdminCo
                 value={searchQuery}
                 onChange={setSearchQuery}
                 label="Search items"
-                placeholder="Search by item name"
+                placeholder="Search by item, description, or category"
                 summary={searchSummary}
-              />
+              >
+                {menuCategorySections.length > 1 ? (
+                  <nav className="menuFloatingNavigator" aria-label="Menu sections">
+                    <div className="menuFloatingNavigatorInner" ref={adminNavigatorInnerRef}>
+                      {menuCategorySections.map((category) => (
+                        <Button
+                          key={category.id}
+                          className="menuFloatingNavigatorPill"
+                          size="sm"
+                          variant={activeMenuCategoryId === category.id ? 'default' : 'secondary'}
+                          type="button"
+                          data-category-id={category.id}
+                          onClick={() => jumpToAdminMenuCategory(category.id, category.anchorId)}
+                        >
+                          {category.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </nav>
+                ) : null}
+              </SearchBar>
 
-              <div className="adminMenuSearchResults">
+              <div className="adminMenuSearchResults" ref={adminMenuResultsRef}>
                 {filteredMenuItems.length === 0 ? (
                   <p className="finePrint">No menu items match that search.</p>
                 ) : (
-                  filteredMenuItems.map((item) => (
-                    <div className="adminMenuItemRow" key={item.id}>
-                      {(() => {
-                        const portionEnabled = isPortionEnabled(item)
-                        const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
-                        const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
-
-                        return (
-                          <>
-                      <div className="stack">
-                        <SummaryRow>
-                          <strong>{item.name}</strong>
-                          <span>
-                            {portionEnabled
-                              ? `Half ${toPrice(item.half_price_cents ?? 0)} · Full ${toPrice(item.full_price_cents ?? 0)}`
-                              : toPrice(item.price_cents)}
-                          </span>
-                        </SummaryRow>
-                        {item.description ? <p>{item.description}</p> : null}
+                  menuCategorySections.map((category) => (
+                    <section
+                      className="adminMenuCategorySection"
+                      key={category.id}
+                      id={category.anchorId}
+                      data-category-id={category.id}
+                    >
+                      <div className="menuCategoryHeader">
+                        <p className="eyebrow">{category.name}</p>
+                        <h2>{category.name}</h2>
                       </div>
-                      {portionEnabled ? (
-                        <div className="adminPortionStepperColumn">
-                          <div className="adminPortionStepperRow">
-                            <span className="adminPortionLabel">Half</span>
-                            <QuantityStepper
-                              value={halfQuantity}
-                              decrementLabel={`Remove half ${item.name}`}
-                              incrementLabel={`Add half ${item.name}`}
-                              onDecrement={() => adjustQuantity(item.id, -1, 'half')}
-                              onIncrement={() => adjustQuantity(item.id, 1, 'half')}
-                            />
-                          </div>
-                          <div className="adminPortionStepperRow">
-                            <span className="adminPortionLabel">Full</span>
-                            <QuantityStepper
-                              value={fullQuantity}
-                              decrementLabel={`Remove full ${item.name}`}
-                              incrementLabel={`Add full ${item.name}`}
-                              onDecrement={() => adjustQuantity(item.id, -1, 'full')}
-                              onIncrement={() => adjustQuantity(item.id, 1, 'full')}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <QuantityStepper
-                          value={quantities[buildQuantityKey(item.id)] ?? 0}
-                          decrementLabel={`Remove one ${item.name}`}
-                          incrementLabel={`Add one ${item.name}`}
-                          onDecrement={() => adjustQuantity(item.id, -1)}
-                          onIncrement={() => adjustQuantity(item.id, 1)}
-                        />
-                      )}
-                          </>
-                        )
-                      })()}
-                    </div>
+                      <div className="adminMenuCategoryRows">
+                        {(filteredMenuItemsByCategory.get(category.id) ?? []).map((item) => (
+                          (() => {
+                            const portionEnabled = isPortionEnabled(item)
+
+                            if (!portionEnabled) {
+                              return (
+                                <div className="adminMenuItemRow" key={item.id}>
+                                  <div className="adminMenuItemInfo">
+                                    <div className="adminMenuItemHeading">
+                                      <strong>{item.name}</strong>
+                                      <p className="finePrint">{toPrice(item.price_cents)}</p>
+                                    </div>
+                                  </div>
+                                  <QuantityStepper
+                                    className="adminMenuItemStepper"
+                                    value={quantities[buildQuantityKey(item.id)] ?? 0}
+                                    decrementLabel={`Remove one ${item.name}`}
+                                    incrementLabel={`Add one ${item.name}`}
+                                    onDecrement={() => adjustQuantity(item.id, -1)}
+                                    onIncrement={() => adjustQuantity(item.id, 1)}
+                                  />
+                                </div>
+                              )
+                            }
+
+                            return (
+                              <Fragment key={item.id}>
+                                <div className="adminMenuItemRow">
+                                  <div className="adminMenuItemInfo">
+                                    <div className="adminMenuItemHeading">
+                                      <strong>{item.name} (Half)</strong>
+                                      <p className="finePrint">{toPrice(item.half_price_cents ?? 0)}</p>
+                                    </div>
+                                  </div>
+                                  <QuantityStepper
+                                    className="adminMenuItemStepper"
+                                    value={quantities[buildQuantityKey(item.id, 'half')] ?? 0}
+                                    decrementLabel={`Remove half ${item.name}`}
+                                    incrementLabel={`Add half ${item.name}`}
+                                    onDecrement={() => adjustQuantity(item.id, -1, 'half')}
+                                    onIncrement={() => adjustQuantity(item.id, 1, 'half')}
+                                  />
+                                </div>
+                                <div className="adminMenuItemRow">
+                                  <div className="adminMenuItemInfo">
+                                    <div className="adminMenuItemHeading">
+                                      <strong>{item.name} (Full)</strong>
+                                      <p className="finePrint">{toPrice(item.full_price_cents ?? 0)}</p>
+                                    </div>
+                                  </div>
+                                  <QuantityStepper
+                                    className="adminMenuItemStepper"
+                                    value={quantities[buildQuantityKey(item.id, 'full')] ?? 0}
+                                    decrementLabel={`Remove full ${item.name}`}
+                                    incrementLabel={`Add full ${item.name}`}
+                                    onDecrement={() => adjustQuantity(item.id, -1, 'full')}
+                                    onIncrement={() => adjustQuantity(item.id, 1, 'full')}
+                                  />
+                                </div>
+                              </Fragment>
+                            )
+                          })()
+                        ))}
+                      </div>
+                    </section>
                   ))
                 )}
               </div>

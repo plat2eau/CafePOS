@@ -13,8 +13,10 @@ import { QuantityStepper } from '@/components/ui/quantity-stepper'
 import { SectionCard } from '@/components/ui/section-card'
 import { SummaryRow } from '@/components/ui/summary-row'
 import { Textarea } from '@/components/ui/textarea'
+import { searchMenuItems } from '@/lib/menu-search'
 
 type Portion = 'half' | 'full'
+type DietKind = 'veg' | 'non-veg'
 
 type MenuCategory = {
   id: string
@@ -29,6 +31,7 @@ type MenuItem = {
   price_cents: number
   half_price_cents: number | null
   full_price_cents: number | null
+  sort_order: number
 }
 
 type GuestOrderingExperienceProps = {
@@ -62,19 +65,54 @@ function isPortionEnabled(item: Pick<MenuItem, 'half_price_cents' | 'full_price_
   return (item.half_price_cents ?? 0) > 0 && (item.full_price_cents ?? 0) > 0
 }
 
-function getDietLabel(description: string | null) {
+function getDietKind(description: string | null): DietKind | null {
   const normalized = description?.trim().toLowerCase() ?? ''
   if (!normalized) return null
 
   if (/\bnon[-\s]?veg\b/i.test(normalized)) {
-    return 'Non veg'
+    return 'non-veg'
   }
 
   if (/\bveg\b/i.test(normalized)) {
-    return 'Veg'
+    return 'veg'
   }
 
   return null
+}
+
+function getDisplayDescription(description: string | null) {
+  if (!description?.trim()) {
+    return null
+  }
+
+  const segments = description
+    .split(/[•·|]/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length < 2) {
+    return description.trim()
+  }
+
+  const visibleSegments = segments.filter((segment) => {
+    const normalized = segment.toLowerCase()
+
+    if (/^non[-\s]?veg$/.test(normalized) || normalized === 'veg') {
+      return false
+    }
+
+    if (/^services?$/.test(normalized)) {
+      return false
+    }
+
+    if (/^\d+\s+servings?$/.test(normalized)) {
+      return false
+    }
+
+    return true
+  })
+
+  return visibleSegments.length > 0 ? visibleSegments.join(' • ') : null
 }
 
 export default function GuestOrderingExperience({
@@ -93,14 +131,19 @@ export default function GuestOrderingExperience({
   const [showSuccessCard, setShowSuccessCard] = useState(false)
   const [isOrderSheetOpen, setIsOrderSheetOpen] = useState(false)
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
-  const [portionDrawerItemId, setPortionDrawerItemId] = useState<string | null>(null)
   const searchBarWrapRef = useRef<HTMLDivElement | null>(null)
+  const floatingOrderBarRef = useRef<HTMLDivElement | null>(null)
   const mobileNavigatorInnerRef = useRef<HTMLDivElement | null>(null)
   const lastNavigatorScrollIdRef = useRef<string | null>(null)
   const [menuStickyOffsetPx, setMenuStickyOffsetPx] = useState<number>(92)
+  const [floatingOrderBarHeightPx, setFloatingOrderBarHeightPx] = useState<number>(196)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
   const orderFormId = `guest-order-form-${tableId}`
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name])),
+    [categories]
+  )
 
   useEffect(() => {
     const element = searchBarWrapRef.current
@@ -123,16 +166,30 @@ export default function GuestOrderingExperience({
     return () => observer.disconnect()
   }, [])
 
-  const filteredItems = useMemo(() => {
-    if (!normalizedSearchQuery) {
-      return items
+  useEffect(() => {
+    const element = floatingOrderBarRef.current
+    if (!element) return
+
+    const updateHeight = () => {
+      const height = element.getBoundingClientRect().height
+      setFloatingOrderBarHeightPx(Math.round(height + 24))
     }
 
-    return items.filter((item) => {
-      const haystack = `${item.name} ${item.description ?? ''}`.toLowerCase()
-      return haystack.includes(normalizedSearchQuery)
-    })
-  }, [items, normalizedSearchQuery])
+    updateHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight)
+      return () => window.removeEventListener('resize', updateHeight)
+    }
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  const filteredItems = useMemo(() => {
+    return searchMenuItems(items, deferredSearchQuery, categoryNameById)
+  }, [categoryNameById, deferredSearchQuery, items])
 
   const filteredCategoryIds = useMemo(
     () => new Set(filteredItems.map((item) => item.category_id)),
@@ -319,7 +376,6 @@ export default function GuestOrderingExperience({
       setShowSuccessCard(true)
       setIsOrderSheetOpen(false)
       setIsNavigatorOpen(false)
-      setPortionDrawerItemId(null)
       const timeout = window.setTimeout(() => {
         router.push(`/table/${tableId}/orders?placed=1`)
       }, 900)
@@ -436,10 +492,6 @@ export default function GuestOrderingExperience({
     setIsNavigatorOpen(false)
   }
 
-  const searchSummary = normalizedSearchQuery
-    ? `${filteredItems.length} matching item${filteredItems.length === 1 ? '' : 's'}`
-    : `${items.length} item${items.length === 1 ? '' : 's'} on the menu`
-
   return (
     <form id={orderFormId} action={formAction} className="sectionStack">
       <input
@@ -458,9 +510,10 @@ export default function GuestOrderingExperience({
       <div
         className="orderLayout"
         style={
-          menuStickyOffsetPx
+          menuStickyOffsetPx || floatingOrderBarHeightPx
             ? ({
-                '--menu-sticky-offset': `${menuStickyOffsetPx}px`
+                '--menu-sticky-offset': `${menuStickyOffsetPx}px`,
+                '--order-floating-offset': `${floatingOrderBarHeightPx}px`
               } as any)
             : undefined
         }
@@ -489,7 +542,6 @@ export default function GuestOrderingExperience({
               placeholder="Search coffee, tea, snacks..."
               value={searchQuery}
               onChange={setSearchQuery}
-              summary={searchSummary}
             >
               {categorySections.length > 1 ? (
                 <nav className="menuFloatingNavigator sm:hidden" aria-label="Menu sections">
@@ -541,52 +593,115 @@ export default function GuestOrderingExperience({
                         const quantity = quantities[buildQuantityKey(item.id)] ?? 0
                         const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
                         const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
-                        const hasPortionSelection = halfQuantity > 0 || fullQuantity > 0
-                        const dietLabel = portionEnabled ? getDietLabel(item.description) : null
+                        const dietKind = getDietKind(item.description)
+                        const displayDescription = getDisplayDescription(item.description)
+
+                        if (portionEnabled) {
+                          return [
+                            <div className="menuItem" key={`${item.id}-half`}>
+                                <div className="menuItemHeader">
+                                  <div className="menuItemTitleBlock">
+                                    <div className="menuItemTitleRow">
+                                      {dietKind ? (
+                                        <span
+                                          className={`dietIndicator ${dietKind === 'veg' ? 'veg' : 'nonVeg'}`}
+                                          aria-label={dietKind === 'veg' ? 'Veg' : 'Non veg'}
+                                          title={dietKind === 'veg' ? 'Veg' : 'Non veg'}
+                                        />
+                                      ) : null}
+                                      <h3>{item.name} (Half)</h3>
+                                    </div>
+                                    {displayDescription ? (
+                                      <div className="menuItemMeta">
+                                        <p>{displayDescription}</p>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+
+                                <div className="menuItemFooter">
+                                  <strong className="menuItemPrice">
+                                    {toPrice(item.half_price_cents ?? 0)}
+                                  </strong>
+                                  <QuantityStepper
+                                    className="menuItemQuantityStepper"
+                                    value={halfQuantity}
+                                    disabled={previewMode}
+                                    decrementLabel={`Remove half ${item.name}`}
+                                    incrementLabel={`Add half ${item.name}`}
+                                    onDecrement={() => adjustPortionQuantity(item.id, 'half', -1)}
+                                    onIncrement={() => adjustPortionQuantity(item.id, 'half', 1)}
+                                  />
+                                </div>
+                              </div>,
+
+                            <div className="menuItem" key={`${item.id}-full`}>
+                                <div className="menuItemHeader">
+                                  <div className="menuItemTitleBlock">
+                                    <div className="menuItemTitleRow">
+                                      {dietKind ? (
+                                        <span
+                                          className={`dietIndicator ${dietKind === 'veg' ? 'veg' : 'nonVeg'}`}
+                                          aria-label={dietKind === 'veg' ? 'Veg' : 'Non veg'}
+                                          title={dietKind === 'veg' ? 'Veg' : 'Non veg'}
+                                        />
+                                      ) : null}
+                                      <h3>{item.name} (Full)</h3>
+                                    </div>
+                                    {displayDescription ? (
+                                      <div className="menuItemMeta">
+                                        <p>{displayDescription}</p>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+
+                                <div className="menuItemFooter">
+                                  <strong className="menuItemPrice">
+                                    {toPrice(item.full_price_cents ?? 0)}
+                                  </strong>
+                                  <QuantityStepper
+                                    className="menuItemQuantityStepper"
+                                    value={fullQuantity}
+                                    disabled={previewMode}
+                                    decrementLabel={`Remove full ${item.name}`}
+                                    incrementLabel={`Add full ${item.name}`}
+                                    onDecrement={() => adjustPortionQuantity(item.id, 'full', -1)}
+                                    onIncrement={() => adjustPortionQuantity(item.id, 'full', 1)}
+                                  />
+                                </div>
+                              </div>
+                          ]
+                        }
 
                         return (
                           <div className="menuItem" key={item.id}>
-                            <div className="sectionStack compact">
-                              <div>
-                                <h3>{item.name}</h3>
-                                {portionEnabled ? (
-                                  <p>
-                                    {dietLabel ? `${dietLabel} · Variable serving` : 'Variable serving'}
-                                  </p>
-                                ) : item.description ? (
-                                  <p>{item.description}</p>
+                            <div className="menuItemHeader">
+                              <div className="menuItemTitleBlock">
+                                <div className="menuItemTitleRow">
+                                  {dietKind ? (
+                                    <span
+                                      className={`dietIndicator ${dietKind === 'veg' ? 'veg' : 'nonVeg'}`}
+                                      aria-label={dietKind === 'veg' ? 'Veg' : 'Non veg'}
+                                      title={dietKind === 'veg' ? 'Veg' : 'Non veg'}
+                                    />
+                                  ) : null}
+                                  <h3>{item.name}</h3>
+                                </div>
+                                {displayDescription ? (
+                                  <div className="menuItemMeta">
+                                    <p>{displayDescription}</p>
+                                  </div>
                                 ) : null}
                               </div>
-                              <strong>
-                                {portionEnabled
-                                  ? `Half ${toPrice(item.half_price_cents ?? 0)}`
-                                  : toPrice(item.price_cents)}
-                              </strong>
                             </div>
 
-                            {portionEnabled ? (
-                              <div className="portionMenuActionRow">
-                                {hasPortionSelection ? (
-                                  <p className="finePrint">
-                                    {halfQuantity > 0 ? `Half x ${halfQuantity}` : null}
-                                    {halfQuantity > 0 && fullQuantity > 0 ? ' · ' : null}
-                                    {fullQuantity > 0 ? `Full x ${fullQuantity}` : null}
-                                  </p>
-                                ) : (
-                                  <p className="finePrint">Choose portion size.</p>
-                                )}
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="secondary"
-                                  disabled={previewMode}
-                                  onClick={() => setPortionDrawerItemId(item.id)}
-                                >
-                                  {hasPortionSelection ? 'Edit' : 'Add'}
-                                </Button>
-                              </div>
-                            ) : (
+                            <div className="menuItemFooter">
+                              <strong className="menuItemPrice">
+                                {toPrice(item.price_cents)}
+                              </strong>
                               <QuantityStepper
+                                className="menuItemQuantityStepper"
                                 value={quantity}
                                 disabled={previewMode}
                                 decrementLabel={`Remove one ${item.name}`}
@@ -594,7 +709,7 @@ export default function GuestOrderingExperience({
                                 onDecrement={() => adjustQuantity(item.id, -1)}
                                 onIncrement={() => adjustQuantity(item.id, 1)}
                               />
-                            )}
+                            </div>
                           </div>
                         )
                       })}
@@ -606,7 +721,10 @@ export default function GuestOrderingExperience({
           </div>
         </div>
 
-        <div className="fixed inset-x-3 bottom-[max(12px,calc(env(safe-area-inset-bottom)+12px))] z-30 mx-auto flex w-[min(720px,calc(100vw-24px))] flex-col gap-3 rounded-[22px] border border-border bg-[var(--panel-strong)] p-3 shadow-[0_16px_32px_rgb(var(--shadow-rgb)/0.12)] backdrop-blur-xl sm:inset-x-5 sm:w-[min(720px,calc(100vw-40px))]">
+        <div
+          ref={floatingOrderBarRef}
+          className="fixed inset-x-3 bottom-[max(12px,calc(env(safe-area-inset-bottom)+12px))] z-30 mx-auto flex w-[min(720px,calc(100vw-24px))] flex-col gap-3 rounded-[22px] border border-border bg-[var(--panel-strong)] p-3 shadow-[0_16px_32px_rgb(var(--shadow-rgb)/0.12)] backdrop-blur-xl sm:inset-x-5 sm:w-[min(720px,calc(100vw-40px))]"
+        >
           <div className="flex items-center justify-between gap-3 rounded-[18px] border border-border bg-[var(--card-bg)] px-4 py-3">
             <div className="min-w-0">
               <p className="m-0 text-sm font-semibold text-foreground">
@@ -727,74 +845,6 @@ export default function GuestOrderingExperience({
           </AppOverlaySheet>
         ) : null}
 
-        {portionDrawerItemId ? (
-          <AppOverlaySheet
-            open
-            onOpenChange={(open) => {
-              if (!open) {
-                setPortionDrawerItemId(null)
-              }
-            }}
-            eyebrow="Portion size"
-            title={items.find((item) => item.id === portionDrawerItemId)?.name ?? 'Choose portion'}
-            description="Select half or full and adjust quantity."
-          >
-            {(() => {
-              const item = items.find((entry) => entry.id === portionDrawerItemId)
-              if (!item || !isPortionEnabled(item)) {
-                return <p className="finePrint">This item does not support portions.</p>
-              }
-
-              const halfQuantity = quantities[buildQuantityKey(item.id, 'half')] ?? 0
-              const fullQuantity = quantities[buildQuantityKey(item.id, 'full')] ?? 0
-
-              return (
-                <div className="stack mt-0">
-                  <div className="portionDrawerRow">
-                    <div className="stack">
-                      <SummaryRow>
-                        <strong>Half</strong>
-                        <span>{toPrice(item.half_price_cents ?? 0)}</span>
-                      </SummaryRow>
-                      <p className="finePrint">Per half plate</p>
-                    </div>
-                    <QuantityStepper
-                      value={halfQuantity}
-                      disabled={previewMode}
-                      decrementLabel={`Remove half ${item.name}`}
-                      incrementLabel={`Add half ${item.name}`}
-                      onDecrement={() => adjustPortionQuantity(item.id, 'half', -1)}
-                      onIncrement={() => adjustPortionQuantity(item.id, 'half', 1)}
-                    />
-                  </div>
-
-                  <div className="portionDrawerRow">
-                    <div className="stack">
-                      <SummaryRow>
-                        <strong>Full</strong>
-                        <span>{toPrice(item.full_price_cents ?? 0)}</span>
-                      </SummaryRow>
-                      <p className="finePrint">Per full plate</p>
-                    </div>
-                    <QuantityStepper
-                      value={fullQuantity}
-                      disabled={previewMode}
-                      decrementLabel={`Remove full ${item.name}`}
-                      incrementLabel={`Add full ${item.name}`}
-                      onDecrement={() => adjustPortionQuantity(item.id, 'full', -1)}
-                      onIncrement={() => adjustPortionQuantity(item.id, 'full', 1)}
-                    />
-                  </div>
-
-                  <SummaryRow variant="total">
-                    <span>Total</span>
-                    <strong>{toPrice(totalCents)}</strong>
-                  </SummaryRow>
-                </div>
-              )
-            })()}
-          </AppOverlaySheet>
-        ) : null}
       </div>
     </form>
   )
