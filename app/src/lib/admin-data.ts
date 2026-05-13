@@ -89,6 +89,27 @@ export type AdminDashboardTopItem = {
   revenueCents: number
 }
 
+export type AdminDashboardOrderItem = {
+  itemName: string
+  portion: 'half' | 'full' | null
+  quantity: number
+  lineTotalCents: number
+}
+
+export type AdminDashboardOrderDetail = {
+  id: string
+  tableId: string | null
+  createdAt: string
+  status: AdminOrder['status']
+  note: string | null
+  totalCents: number
+  orderedByName: string
+  orderedByPhone: string
+  guestName: string | null
+  guestPhone: string | null
+  items: AdminDashboardOrderItem[]
+}
+
 export type AdminDashboardTrendGranularity = 'hour' | 'day'
 
 export type AdminDashboardTrendPoint = {
@@ -121,6 +142,7 @@ export type AdminDashboardData = {
   trendGranularity: AdminDashboardTrendGranularity
   salesTrend: Array<Pick<AdminDashboardTrendPoint, 'key' | 'label' | 'revenueCents'>>
   orderTrend: Array<Pick<AdminDashboardTrendPoint, 'key' | 'label' | 'orderCount'>>
+  orders: AdminDashboardOrderDetail[]
   opsSnapshot: {
     openServiceRequests: number
     oldestOpenRequestMinutes: number | null
@@ -587,7 +609,9 @@ export async function getAdminDashboardData(options?: {
   const [ordersResult, sessionsResult, serviceRequestsResult] = await Promise.all([
     supabase
       .from('orders')
-      .select('id, table_id, status, total_cents, created_at')
+      .select(
+        'id, table_id, session_id, status, note, total_cents, created_at, ordered_by_name, ordered_by_phone'
+      )
       .gte('created_at', range.startAt)
       .lt('created_at', range.endAt)
       .order('created_at', { ascending: true }),
@@ -623,13 +647,76 @@ export async function getAdminDashboardData(options?: {
   const orderItemsResult = orderIds.length
     ? await supabase
         .from('order_items')
-        .select('order_id, item_name, quantity, line_total_cents')
+        .select('order_id, item_name, portion, quantity, line_total_cents')
         .in('order_id', orderIds)
     : { data: [], error: null }
 
   if (orderItemsResult.error) {
     throw new Error('Could not load dashboard order items.')
   }
+
+  const orderSessionIds = Array.from(
+    new Set(
+      orders
+        .map((order) => order.session_id)
+        .filter((sessionId): sessionId is string => Boolean(sessionId))
+    )
+  )
+  const orderSessionsResult = orderSessionIds.length
+    ? await supabase
+        .from('table_sessions')
+        .select('id, guest_name, guest_phone')
+        .in('id', orderSessionIds)
+    : { data: [], error: null }
+
+  if (orderSessionsResult.error) {
+    throw new Error('Could not load dashboard order guests.')
+  }
+
+  const sessionGuestById = new Map(
+    (orderSessionsResult.data ?? []).map((session) => [
+      session.id,
+      {
+        guestName: session.guest_name,
+        guestPhone: session.guest_phone
+      }
+    ])
+  )
+  const orderItemsByOrderId = new Map<string, AdminDashboardOrderItem[]>()
+
+  for (const item of orderItemsResult.data ?? []) {
+    const orderItems = orderItemsByOrderId.get(item.order_id) ?? []
+
+    orderItems.push({
+      itemName: item.item_name,
+      portion: item.portion,
+      quantity: item.quantity,
+      lineTotalCents: item.line_total_cents
+    })
+    orderItemsByOrderId.set(item.order_id, orderItems)
+  }
+
+  const dashboardOrders: AdminDashboardOrderDetail[] = [...orders]
+    .sort(
+      (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+    )
+    .map((order) => {
+      const sessionGuest = order.session_id ? sessionGuestById.get(order.session_id) : null
+
+      return {
+        id: order.id,
+        tableId: order.table_id,
+        createdAt: order.created_at,
+        status: order.status,
+        note: order.note,
+        totalCents: order.total_cents,
+        orderedByName: order.ordered_by_name,
+        orderedByPhone: order.ordered_by_phone,
+        guestName: sessionGuest?.guestName ?? null,
+        guestPhone: sessionGuest?.guestPhone ?? null,
+        items: orderItemsByOrderId.get(order.id) ?? []
+      }
+    })
 
   const statusBreakdown = createStatusBreakdown()
   const itemMetrics = new Map<string, AdminDashboardTopItem>()
@@ -763,6 +850,7 @@ export async function getAdminDashboardData(options?: {
       label: point.label,
       orderCount: point.orderCount
     })),
+    orders: dashboardOrders,
     opsSnapshot: {
       openServiceRequests: openServiceRequests.length,
       oldestOpenRequestMinutes,

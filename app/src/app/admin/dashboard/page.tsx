@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { EmptyStateCard, MetricCard } from '@/components/AppCards'
 import AdminDashboardDateFilter from '@/components/AdminDashboardDateFilter'
+import AdminDashboardOrdersDialog from '@/components/AdminDashboardOrdersDialog'
 import AdminLogoutButton from '@/components/AdminLogoutButton'
 import { Button } from '@/components/ui/button'
 import { SectionCard } from '@/components/ui/section-card'
@@ -522,6 +523,12 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
         <AdminDashboardDateFilter
           fromDate={dashboard.range.fromDate}
           toDate={dashboard.range.toDate}
+          timezone={dashboard.range.timezone}
+        />
+
+        <AdminDashboardOrdersDialog
+          orders={dashboard.orders}
+          rangeLabel={rangeLabel}
           timezone={dashboard.range.timezone}
         />
 
