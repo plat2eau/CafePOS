@@ -81,7 +81,7 @@ export function formatReceiptTimestamp(value: string) {
 
 export function buildReceiptQrValue(payload: ReceiptPayload) {
   const params = new URLSearchParams({
-    pa: '9816822303@ptsbi',
+    pa: 'SBIBHIM.INSTANT73394218716016620@sbipay',
     pn: cafeReceiptHeader.name,
     am: (payload.grandTotalCents / 100).toFixed(2),
     cu: 'INR',
