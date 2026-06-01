@@ -1,5 +1,4 @@
 import Image from 'next/image'
-import Link from 'next/link'
 import { cookies } from 'next/headers'
 import {
   createOrRefreshTableSession,
@@ -7,15 +6,14 @@ import {
   placeOrderForTable
 } from '@/app/table/[tableId]/actions'
 import { EmptyStateCard } from '@/components/AppCards'
+import GuestCustomerFlow from '@/components/GuestCustomerFlow'
+import GuestOrderHistory from '@/components/GuestOrderHistory'
 import GuestSessionAutoResume from '@/components/GuestSessionAutoResume'
 import GuestSessionForm from '@/components/GuestSessionForm'
-import GuestOrderingExperience from '@/components/GuestOrderingExperience'
 import GuestServiceRequestPanel from '@/components/GuestServiceRequestPanel'
-import { Button } from '@/components/ui/button'
 import { SectionCard } from '@/components/ui/section-card'
 import { getAdminAuthContext } from '@/lib/admin-auth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Database } from '@/lib/database.types'
 import {
   getTableOrderIdentityCookieName,
   getTableSessionCookieName,
@@ -26,13 +24,15 @@ type TablePageProps = {
   params: Promise<{
     tableId: string
   }>
+  searchParams: Promise<{
+    placed?: string
+    tab?: string
+  }>
 }
 
-type MenuCategory = Database['public']['Tables']['menu_categories']['Row']
-type MenuItem = Database['public']['Tables']['menu_items']['Row']
-
-export default async function TablePage({ params }: TablePageProps) {
+export default async function TablePage({ params, searchParams }: TablePageProps) {
   const { tableId } = await params
+  const { placed, tab } = await searchParams
   const supabase = createServerSupabaseClient()
   const cookieStore = await cookies()
   const currentSessionId = cookieStore.get(getTableSessionCookieName(tableId))?.value
@@ -80,19 +80,18 @@ export default async function TablePage({ params }: TablePageProps) {
     table?.is_active && (isAdminPreview || (activeSession && isCurrentGuestSession))
   )
   const activeOrdererName = orderIdentity?.name ?? activeSession?.guest_name ?? ''
+  const accessibleSessionId = currentSessionId ?? (isAdminPreview ? activeSession?.id ?? null : null)
 
-  const itemsByCategory = new Map<string, MenuItem[]>(
-    (categories ?? []).map((category: MenuCategory) => [category.id, []])
-  )
-
-  for (const item of items ?? []) {
-    const list = itemsByCategory.get(item.category_id)
-    if (list) {
-      list.push(item)
-    } else {
-      itemsByCategory.set(item.category_id, [item])
-    }
-  }
+  const { data: orders, error: ordersError } = accessibleSessionId
+    ? await supabase
+      .from('orders')
+      .select(
+        'id, created_at, status, note, total_cents, ordered_by_name, ordered_by_phone, order_items(item_name, quantity, line_total_cents)'
+      )
+      .eq('table_id', tableId)
+        .eq('session_id', accessibleSessionId)
+        .order('created_at', { ascending: false })
+    : { data: null, error: null }
 
   return (
     <main>
@@ -126,10 +125,8 @@ export default async function TablePage({ params }: TablePageProps) {
               />
             </div>
           </div>
-          <p className="eyebrow">CafePOS</p>
           <div className="heroHeaderRow">
             <div className="sectionStack">
-              <h1>{table?.label ?? `Table ${tableId}`}</h1>
               {hasError ? (
                 <p className="lead">We are having trouble loading this table right now. Please ask a staff member for help.</p>
               ) : !table ? (
@@ -137,19 +134,11 @@ export default async function TablePage({ params }: TablePageProps) {
               ) : !table.is_active ? (
                 <p className="lead">This table is currently unavailable. Please ask the cafe team for assistance.</p>
               ) : (
-                <p className="lead">Fresh coffee, tea, and bites made for your table.</p>
+                ""
               )}
             </div>
           </div>
         </div>
-
-	        {canAccessOrdering ? (
-	          <div className="buttonRow">
-	            <Button asChild size="form" variant="default" className="md:w-auto" >
-	              <Link href={`/table/${tableId}/orders`} style={{color: "white"}}>View order history</Link>
-	            </Button>
-	          </div>
-	        ) : null}
 
         {!hasError && table && table.is_active && !canAccessOrdering && (
           <SectionCard
@@ -187,42 +176,23 @@ export default async function TablePage({ params }: TablePageProps) {
         )}
 
         {!hasError && table && table.is_active && canAccessOrdering && (activeSession || isAdminPreview) && (
-          <div className="sectionStack">
-            <SectionCard
-              tone="support"
-              className="bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.12),transparent_36%),linear-gradient(135deg,var(--panel-strong),var(--card-bg-strong))]"
-            >
-              <p className="eyebrow">{isAdminPreview ? 'Admin preview' : 'Ready to order'}</p>
-              <h2>
-                {isAdminPreview
-                  ? activeSession
-                    ? `Previewing ${activeSession.guest_name}'s table`
-                    : `Previewing table ${tableId}`
-                  : `Ordering as ${activeOrdererName || activeSession?.guest_name || 'Guest'}`}
-              </h2>
-              <p>
-                {isAdminPreview
-                  ? 'You are viewing the guest experience as staff. Ordering and service actions are disabled in preview mode.'
-                  : 'Pick your favourites and send your order whenever you are ready.'}
-              </p>
+          <div className="sectionStack compact">
+            <div className="metaPillRow">
+              <span className="metaPill">{table?.label ?? `Table ${tableId}`}</span>
               {activeSession ? (
-                <>
-                  <div className="metaPillRow">
-                    <span className="metaPill">
-                      Session PIN <strong>{activeSession.session_pin}</strong>
-                    </span>
-                  </div>
-                  <p className="finePrint">
-                    Share this PIN only with someone joining this same table on another device.
-                  </p>
-                </>
+                <span className="metaPill">
+                  Session PIN <strong>{activeSession.session_pin}</strong>
+                </span>
               ) : null}
-            </SectionCard>
-            <GuestServiceRequestPanel action={serviceRequestAction} previewMode={isAdminPreview} />
-            <GuestOrderingExperience
+              {isAdminPreview ? <span className="metaPill">Admin preview</span> : null}
+            </div>
+
+            <GuestCustomerFlow
               tableId={tableId}
               categories={categories ?? []}
               items={items ?? []}
+              initialPlaced={placed === '1'}
+              initialTab={tab ?? null}
               action={placeOrderAction}
               guestName={
                 isAdminPreview
@@ -230,6 +200,18 @@ export default async function TablePage({ params }: TablePageProps) {
                   : activeOrdererName || activeSession?.guest_name || 'Guest'
               }
               previewMode={isAdminPreview}
+              menuIntro={null}
+              desktopServicePanel={
+                <GuestServiceRequestPanel action={serviceRequestAction} previewMode={isAdminPreview} />
+              }
+              orderHistory={
+                <GuestOrderHistory
+                  accessibleSessionId={accessibleSessionId}
+                  adminPreview={isAdminPreview}
+                  errorMessage={ordersError?.message}
+                  orders={orders}
+                />
+              }
             />
           </div>
         )}

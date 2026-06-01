@@ -4,15 +4,21 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 type GuestOrderHistoryPollerProps = {
+  active?: boolean
   intervalMs?: number
 }
 
 export default function GuestOrderHistoryPoller({
+  active = true,
   intervalMs = 5000
 }: GuestOrderHistoryPollerProps) {
   const router = useRouter()
 
   useEffect(() => {
+    if (!active) {
+      return
+    }
+
     let cancelled = false
 
     function refreshOrders() {
@@ -38,7 +44,7 @@ export default function GuestOrderHistoryPoller({
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [intervalMs, router])
+  }, [active, intervalMs, router])
 
   return null
 }
