@@ -132,6 +132,7 @@ export default function GuestOrderingExperience({
   const [showSuccessCard, setShowSuccessCard] = useState(false)
   const [isOrderSheetOpen, setIsOrderSheetOpen] = useState(false)
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
+  const hasHandledSuccessRef = useRef(false)
   const searchBarWrapRef = useRef<HTMLDivElement | null>(null)
   const floatingOrderBarRef = useRef<HTMLDivElement | null>(null)
   const mobileNavigatorInnerRef = useRef<HTMLDivElement | null>(null)
@@ -372,6 +373,11 @@ export default function GuestOrderingExperience({
 
   useEffect(() => {
     if (state.status === 'success') {
+      if (hasHandledSuccessRef.current) {
+        return
+      }
+
+      hasHandledSuccessRef.current = true
       setQuantities({})
       setNote('')
       setShowSuccessCard(true)
@@ -387,10 +393,13 @@ export default function GuestOrderingExperience({
     }
 
     if (state.status === 'error') {
+      hasHandledSuccessRef.current = false
       setShowSuccessCard(false)
       setIsOrderSheetOpen(true)
       return
     }
+
+    hasHandledSuccessRef.current = false
   }, [onOrderSuccess, router, state.status, tableId])
 
   useEffect(() => {
@@ -552,11 +561,12 @@ export default function GuestOrderingExperience({
                     {categorySections.map((category) => (
                       <Button
                         key={category.id}
-                        className="menuFloatingNavigatorPill"
+                        className={`menuFloatingNavigatorPill ${activeCategoryId === category.id ? 'isActive' : ''}`}
                         size="sm"
                         variant={activeCategoryId === category.id ? 'default' : 'secondary'}
                         type="button"
                         data-category-id={category.id}
+                        aria-current={activeCategoryId === category.id ? 'true' : undefined}
                         onClick={() => jumpToCategory(category.id, category.anchorId)}
                       >
                         {category.name}
@@ -754,10 +764,27 @@ export default function GuestOrderingExperience({
             ) : (
               selectedItems.map((item) => (
                 <SummaryRow key={item.key}>
-                  <span>
-                    {item.name} x {item.quantity}
-                  </span>
-                  <strong>{toPrice(item.quantity * item.unitPriceCents)}</strong>
+                  <span>{item.name}</span>
+                  <div className="flex flex-col items-end gap-2">
+                    <QuantityStepper
+                      value={item.quantity}
+                      disabled={previewMode}
+                      className="reviewOrderQuantityStepper"
+                      decrementLabel={`Remove one ${item.name}`}
+                      incrementLabel={`Add one ${item.name}`}
+                      onDecrement={() =>
+                        item.portion
+                          ? adjustPortionQuantity(item.itemId, item.portion, -1)
+                          : adjustQuantity(item.itemId, -1)
+                      }
+                      onIncrement={() =>
+                        item.portion
+                          ? adjustPortionQuantity(item.itemId, item.portion, 1)
+                          : adjustQuantity(item.itemId, 1)
+                      }
+                    />
+                    <strong>{toPrice(item.quantity * item.unitPriceCents)}</strong>
+                  </div>
                 </SummaryRow>
               ))
             )}

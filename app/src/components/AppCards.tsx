@@ -81,7 +81,7 @@ function OrderCard({
   className
 }: OrderCardProps) {
   return (
-    <SurfaceCard className={cn('flex flex-col gap-4', className)}>
+    <SurfaceCard className={cn('orderCardSurface flex flex-col gap-4', className)}>
       <SummaryRow>
         <strong>{title}</strong>
         {timestamp ? <span>{timestamp}</span> : <span />}

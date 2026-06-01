@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import { cookies } from 'next/headers'
 import {
   createOrRefreshTableSession,
@@ -8,11 +9,15 @@ import {
 import { EmptyStateCard } from '@/components/AppCards'
 import GuestCustomerFlow from '@/components/GuestCustomerFlow'
 import GuestOrderHistory from '@/components/GuestOrderHistory'
+import GuestPaymentTab from '@/components/GuestPaymentTab'
 import GuestSessionAutoResume from '@/components/GuestSessionAutoResume'
 import GuestSessionForm from '@/components/GuestSessionForm'
 import GuestServiceRequestPanel from '@/components/GuestServiceRequestPanel'
+import { Button } from '@/components/ui/button'
 import { SectionCard } from '@/components/ui/section-card'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import type { AdminOrder } from '@/lib/admin-data'
+import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   getTableOrderIdentityCookieName,
@@ -89,9 +94,40 @@ export default async function TablePage({ params, searchParams }: TablePageProps
         'id, created_at, status, note, total_cents, ordered_by_name, ordered_by_phone, order_items(item_name, quantity, line_total_cents)'
       )
       .eq('table_id', tableId)
-        .eq('session_id', accessibleSessionId)
-        .order('created_at', { ascending: false })
+      .eq('session_id', accessibleSessionId)
+      .order('created_at', { ascending: false })
     : { data: null, error: null }
+
+  const receiptOrders: AdminOrder[] = (orders ?? []).map((order) => ({
+    id: order.id,
+    table_id: tableId,
+    created_at: order.created_at,
+    status: order.status as AdminOrder['status'],
+    note: order.note,
+    total_cents: order.total_cents,
+    session_id: accessibleSessionId,
+    guest_name: activeSession?.guest_name ?? null,
+    ordered_by_name: order.ordered_by_name,
+    ordered_by_phone: order.ordered_by_phone ?? '',
+    items: (order.order_items ?? []).map((item, index) => ({
+      id: `${order.id}-${index}`,
+      menu_item_id: null,
+      item_name: item.item_name,
+      portion: null,
+      quantity: item.quantity,
+      unit_price_cents:
+        item.quantity > 0 ? Math.round(item.line_total_cents / item.quantity) : item.line_total_cents,
+      line_total_cents: item.line_total_cents
+    }))
+  }))
+
+  const receiptPayload =
+    accessibleSessionId && receiptOrders.length > 0
+      ? buildReceiptPayloadForOrders({
+          guestName: activeSession?.guest_name || activeOrdererName || 'Guest',
+          orders: receiptOrders
+        })
+      : null
 
   return (
     <main>
@@ -177,14 +213,17 @@ export default async function TablePage({ params, searchParams }: TablePageProps
 
         {!hasError && table && table.is_active && canAccessOrdering && (activeSession || isAdminPreview) && (
           <div className="sectionStack compact">
-            <div className="metaPillRow">
-              <span className="metaPill">{table?.label ?? `Table ${tableId}`}</span>
+            <div className="metaPillRow guestDesktopTopMetaRow">
+              <strong className="metaPill">{table?.label ?? `Table ${tableId}`}</strong>
               {activeSession ? (
                 <span className="metaPill">
-                  Session PIN <strong>{activeSession.session_pin}</strong>
+                  Session PIN &nbsp; <strong>{activeSession.session_pin}</strong>
                 </span>
               ) : null}
               {isAdminPreview ? <span className="metaPill">Admin preview</span> : null}
+              <Button asChild variant="secondary" size="sm" className="guestDesktopTopHistoryButton">
+                <Link href={`/table/${tableId}?tab=orders`}>View order history</Link>
+              </Button>
             </div>
 
             <GuestCustomerFlow
@@ -210,6 +249,13 @@ export default async function TablePage({ params, searchParams }: TablePageProps
                   adminPreview={isAdminPreview}
                   errorMessage={ordersError?.message}
                   orders={orders}
+                />
+              }
+              paymentTab={
+                <GuestPaymentTab
+                  accessibleSessionId={accessibleSessionId}
+                  adminPreview={isAdminPreview}
+                  receiptPayload={receiptPayload}
                 />
               }
             />

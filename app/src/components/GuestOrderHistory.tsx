@@ -44,9 +44,8 @@ export default function GuestOrderHistory({
 }: GuestOrderHistoryProps) {
   return (
     <div className="sectionStack">
-      <div className="heroHeader compact">
+      <div className="guestOrderHistoryHeader">
         <h2>Past orders</h2>
-        <p className="lead">Orders associated with this active table session appear here.</p>
         {accessibleSessionId ? (
           <div className="metaPillRow">
             <span className="metaPill">
@@ -56,7 +55,7 @@ export default function GuestOrderHistory({
         ) : null}
       </div>
 
-      <div className="compactGrid">
+      <div className="guestOrderHistoryList">
         {!accessibleSessionId ? (
           <EmptyStateCard
             eyebrow="Session required"
@@ -76,6 +75,7 @@ export default function GuestOrderHistory({
         ) : orders && orders.length > 0 ? (
           orders.map((order) => (
             <OrderCard
+              className="guestOrderHistoryCard"
               key={order.id}
               title={`Order ${order.id.slice(0, 8)}`}
               timestamp={new Intl.DateTimeFormat('en-IN', {

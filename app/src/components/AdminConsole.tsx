@@ -297,15 +297,15 @@ export default function AdminConsole({
           const quantity = quantities[buildQuantityKey(item.id)] ?? 0
           return quantity > 0
             ? [
-                {
-                  key: buildQuantityKey(item.id),
-                  itemId: item.id,
-                  portion: null as Portion | null,
-                  name: item.name,
-                  unitPriceCents: item.price_cents,
-                  quantity
-                }
-              ]
+              {
+                key: buildQuantityKey(item.id),
+                itemId: item.id,
+                portion: null as Portion | null,
+                name: item.name,
+                unitPriceCents: item.price_cents,
+                quantity
+              }
+            ]
             : []
         }
 
@@ -802,9 +802,9 @@ export default function AdminConsole({
       orders: current.orders.map((order) =>
         order.id === orderId
           ? {
-              ...order,
-              status: payload?.status ?? nextStatus
-            }
+            ...order,
+            status: payload?.status ?? nextStatus
+          }
           : order
       )
     }))
@@ -1219,7 +1219,7 @@ export default function AdminConsole({
           </div>
         </SectionCard>
 
-        <SectionCard tone="support" style={{flexGrow: 1}}>
+        <SectionCard tone="support" style={{ flexGrow: 1 }}>
           <p className="eyebrow">Occupied tables</p>
           <h2>Session overview</h2>
           <div className="stack">
@@ -1242,11 +1242,11 @@ export default function AdminConsole({
                   <SectionCard
                     key={session.id}
                     tone="support"
-                    style={{display: "flex", gap: "16px", flexDirection: "column"}}
+                    style={{ display: "flex", gap: "16px", flexDirection: "column" }}
                     className="bg-[radial-gradient(circle_at_top_right,rgb(var(--accent-rgb)/0.08),transparent_32%),var(--card-bg-strong)]"
                   >
                     <SummaryRow>
-                      <strong>{tableLabel}</strong>
+                      <b>{tableLabel}</b>
                       <span>{orderCount} order{orderCount === 1 ? '' : 's'}</span>
                     </SummaryRow>
                     <p>{session.guest_name}</p>
@@ -1259,19 +1259,19 @@ export default function AdminConsole({
                     </div>
                     <ActionGroup>
                       <LoadingButton
-                            size="form"
-                            className="md:w-auto"
-                            type="button"
-                            loading={isClearingTable && clearTargetTableId === session.table_id}
-                            loadingLabel="Clearing table..."
-                            disabled={isClearingTable}
-                            onClick={() => {
-                              setDiscountPercentage('')
-                              setClearTargetTableId(session.table_id)
-                            }}
-                          >
-                            Clear table
-                          </LoadingButton>
+                        size="form"
+                        className="md:w-auto"
+                        type="button"
+                        loading={isClearingTable && clearTargetTableId === session.table_id}
+                        loadingLabel="Clearing table..."
+                        disabled={isClearingTable}
+                        onClick={() => {
+                          setDiscountPercentage('')
+                          setClearTargetTableId(session.table_id)
+                        }}
+                      >
+                        Clear table
+                      </LoadingButton>
                       <Button
                         size="form"
                         className="md:w-auto"
@@ -1791,7 +1791,27 @@ export default function AdminConsole({
                 ) : null}
 
                 {selectedItems.map((item) => (
-                    <div className="adminOrderSummaryItem" key={item.key}>
+                  <div className="adminOrderSummaryItem" key={item.key}>
+                    <div className="stack">
+                      <SummaryRow>
+                        <strong>{item.name}</strong>
+                        <span>{toPrice(item.unitPriceCents * item.quantity)}</span>
+                      </SummaryRow>
+                      <p className="finePrint">{toPrice(item.unitPriceCents)} each</p>
+                    </div>
+                    <QuantityStepper
+                      value={item.quantity}
+                      decrementLabel={`Reduce ${item.name}`}
+                      incrementLabel={`Increase ${item.name}`}
+                      onDecrement={() => adjustQuantity(item.itemId, -1, item.portion)}
+                      onIncrement={() => adjustQuantity(item.itemId, 1, item.portion)}
+                    />
+                  </div>
+                ))}
+
+                {normalizedCustomItems.length > 0
+                  ? normalizedCustomItems.map((item) => (
+                    <div className="adminOrderSummaryItem" key={item.id}>
                       <div className="stack">
                         <SummaryRow>
                           <strong>{item.name}</strong>
@@ -1803,31 +1823,11 @@ export default function AdminConsole({
                         value={item.quantity}
                         decrementLabel={`Reduce ${item.name}`}
                         incrementLabel={`Increase ${item.name}`}
-                        onDecrement={() => adjustQuantity(item.itemId, -1, item.portion)}
-                        onIncrement={() => adjustQuantity(item.itemId, 1, item.portion)}
+                        onDecrement={() => adjustCustomItemQuantity(item.id, -1)}
+                        onIncrement={() => adjustCustomItemQuantity(item.id, 1)}
                       />
                     </div>
-                  ))}
-
-                {normalizedCustomItems.length > 0
-                  ? normalizedCustomItems.map((item) => (
-                      <div className="adminOrderSummaryItem" key={item.id}>
-                        <div className="stack">
-                          <SummaryRow>
-                            <strong>{item.name}</strong>
-                            <span>{toPrice(item.unitPriceCents * item.quantity)}</span>
-                          </SummaryRow>
-                          <p className="finePrint">{toPrice(item.unitPriceCents)} each</p>
-                        </div>
-                        <QuantityStepper
-                          value={item.quantity}
-                          decrementLabel={`Reduce ${item.name}`}
-                          incrementLabel={`Increase ${item.name}`}
-                          onDecrement={() => adjustCustomItemQuantity(item.id, -1)}
-                          onIncrement={() => adjustCustomItemQuantity(item.id, 1)}
-                        />
-                      </div>
-                    ))
+                  ))
                   : null}
               </div>
 

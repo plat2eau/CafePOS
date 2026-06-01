@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import type { PlaceOrderActionState } from '@/app/table/[tableId]/actions'
 import GuestOrderHistoryPoller from '@/components/GuestOrderHistoryPoller'
@@ -41,6 +41,7 @@ type GuestCustomerFlowProps = {
   menuIntro: ReactNode
   desktopServicePanel: ReactNode
   orderHistory: ReactNode
+  paymentTab: ReactNode
 }
 
 function getCustomerTab(value: string | null): CustomerTab {
@@ -62,7 +63,8 @@ export default function GuestCustomerFlow({
   previewMode = false,
   menuIntro,
   desktopServicePanel,
-  orderHistory
+  orderHistory,
+  paymentTab
 }: GuestCustomerFlowProps) {
   const pathname = usePathname()
   const [activeTab, setActiveTab] = useState<CustomerTab>(() => getCustomerTab(initialTab))
@@ -106,19 +108,19 @@ export default function GuestCustomerFlow({
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  function openTab(tab: CustomerTab, placed = false) {
+  const openTab = useCallback((tab: CustomerTab, placed = false) => {
     setActiveTab(tab)
     setHasPlacedOrder(placed)
-  }
+  }, [])
 
-  function handleOrderSuccess() {
+  const handleOrderSuccess = useCallback(() => {
     if (window.matchMedia('(max-width: 639px)').matches) {
       openTab('orders', true)
       return true
     }
 
     return false
-  }
+  }, [openTab])
 
   const tabs = useMemo<Array<{ id: CustomerTab; label: string }>>(
     () => [
@@ -135,11 +137,6 @@ export default function GuestCustomerFlow({
 
       <div className={`guestCustomerTabPanel ${activeTab === 'menu' ? 'isActive' : ''}`}>
         <div className="sectionStack">
-          <div className="guestDesktopOnly guestDesktopHistoryAction">
-            <Button size="form" type="button" className="md:w-auto" onClick={() => openTab('orders')}>
-              View order history
-            </Button>
-          </div>
           {menuIntro}
           <div className="guestDesktopOnly">{desktopServicePanel}</div>
           <GuestOrderingExperience
@@ -155,11 +152,6 @@ export default function GuestCustomerFlow({
       </div>
 
       <div className={`guestCustomerTabPanel ${activeTab === 'orders' ? 'isActive' : ''}`}>
-        <div className="guestDesktopOnly guestDesktopHistoryAction">
-          <Button size="form" variant="secondary" type="button" className="md:w-auto" onClick={() => openTab('menu')}>
-            Back to menu
-          </Button>
-        </div>
         <div className="sectionStack">
           {hasPlacedOrder ? (
             <SectionCard tone="success">
@@ -175,7 +167,9 @@ export default function GuestCustomerFlow({
       <div
         className={`guestCustomerTabPanel guestPaymentTabPanel ${activeTab === 'payment' ? 'isActive' : ''}`}
         aria-label="Payment"
-      />
+      >
+        <div className="sectionStack">{paymentTab}</div>
+      </div>
 
       <nav className="guestMobileTabBar" aria-label="Customer sections">
         {tabs.map((tab) => (

@@ -132,7 +132,7 @@ main {
 .hero {
   border: 1px solid var(--border);
   border-radius: clamp(20px, 3vw, 28px);
-  padding: clamp(20px, 4vw, 40px);
+  padding: clamp(24px, 4.5vw, 44px) clamp(20px, 4vw, 40px) clamp(20px, 4vw, 40px);
   background: var(--panel);
   box-shadow: var(--shadow);
 }
@@ -203,12 +203,10 @@ main {
 
 .customerBrandBlinkAssetDark {
   opacity: 1;
-  animation: customerBrandGlow 1.8s ease-in-out infinite;
 }
 
 html[data-color-scheme='dark'] .customerBrandBlinkAssetLight {
   opacity: 1;
-  animation: customerBrandGlow 1.8s ease-in-out infinite;
 }
 
 html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
@@ -261,6 +259,14 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   gap: 10px;
 }
 
+.guestDesktopTopMetaRow {
+  align-items: center;
+}
+
+.guestDesktopTopHistoryButton {
+  margin-left: auto;
+}
+
 .metaPill {
   display: inline-flex;
   align-items: center;
@@ -311,6 +317,74 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
 .guestDesktopHistoryAction {
   margin-bottom: 20px;
+}
+
+.guestOrderHistoryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.guestOrderHistoryHeader h2 {
+  margin: 0;
+  font-size: clamp(1.05rem, 1.8vw, 1.3rem);
+  line-height: 1.1;
+}
+
+.guestOrderHistoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.orderCardSurface.guestOrderHistoryCard {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.guestOrderHistoryList>.guestOrderHistoryCard+.guestOrderHistoryCard {
+  padding-top: 14px;
+  border-top: 3px solid rgb(var(--accent-rgb) / 0.18);
+}
+
+.guestPaymentTabContent {
+  gap: 14px;
+}
+
+.guestReceiptPaperCard {
+  width: min(420px, 100%);
+  padding: 22px 18px 24px;
+}
+
+.guestReceiptNote {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.guestPaymentActions {
+  padding-top: 4px;
+}
+
+.guestUpiButton {
+  min-height: 42px;
+  width: 100%;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+html[data-color-scheme='dark'] .guestUpiButton {
+  border-color: rgb(var(--accent-rgb) / 0.5);
+  background: rgb(var(--accent-rgb) / 1);
+  color: #08131f;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 8px 18px rgb(3 10 20 / 0.18);
 }
 
 .grid {
@@ -481,6 +555,23 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   letter-spacing: -0.02em;
 }
 
+.reviewOrderQuantityStepper {
+  gap: 4px;
+  padding: 2px;
+  border-width: 1px;
+}
+
+.reviewOrderQuantityStepper .quantityButton {
+  width: 32px;
+  height: 32px;
+  font-size: 1rem;
+}
+
+.reviewOrderQuantityStepper .quantityValue {
+  min-width: 1.5ch;
+  font-size: 0.88rem;
+}
+
 .portionDrawerRow {
   display: flex;
   align-items: center;
@@ -530,6 +621,24 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   border-radius: 999px;
 }
 
+.menuFloatingNavigatorPill.isActive {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+  background: rgb(var(--accent-rgb) / 1);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 0 0 1px rgb(var(--accent-rgb) / 0.08);
+}
+
+html[data-color-scheme='dark'] .menuFloatingNavigatorPill.isActive {
+  border-color: rgb(var(--accent-rgb) / 0.5);
+  background: rgb(var(--accent-rgb) / 1);
+  color: #08131f;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 8px 18px rgb(3 10 20 / 0.18);
+}
+
 .menuFloatingNavigatorSpacer {
   height: 64px;
 }
@@ -539,6 +648,10 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 }
 
 @media (min-width: 640px) {
+  .guestDesktopTopMetaRow {
+    flex-wrap: nowrap;
+  }
+
   .menuSectionsButton {
     display: inline-flex;
   }
@@ -635,6 +748,20 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
   .guestPaymentTabPanel {
     min-height: 1px;
+  }
+
+  .guestDesktopTopHistoryButton {
+    display: none;
+  }
+
+  .guestOrderHistoryHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .guestReceiptPaperCard {
+    padding: 20px 16px 22px;
   }
 
   .menuCategoryCard {
