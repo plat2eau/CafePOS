@@ -7,23 +7,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SectionCard } from '@/components/ui/section-card'
+import {
+  addCivilDays,
+  businessDateRangeToUnixSeconds,
+  businessDateToRange,
+  defaultBusinessTimezone,
+  formatDateKey,
+  getBusinessDateParts,
+  parseDateKey
+} from '@/lib/business-day'
+import type { DateOnlyParts } from '@/lib/business-day'
 
 type AdminDashboardDateFilterProps = {
   fromDate: string
   toDate: string
   timezone: string
 }
-
-type DateParts = {
-  year: number
-  month: number
-  day: number
-  hour: number
-  minute: number
-  second: number
-}
-
-type DateOnlyParts = Pick<DateParts, 'year' | 'month' | 'day'>
 
 type QuickFilter = {
   label: string
@@ -32,110 +31,17 @@ type QuickFilter = {
 }
 
 function parseDateInput(value: string) {
-  const [year, month, day] = value.split('-').map((part) => Number.parseInt(part, 10))
-
-  if (!year || !month || !day) {
-    return null
-  }
-
-  return { year, month, day }
-}
-
-function padDatePart(value: number) {
-  return value.toString().padStart(2, '0')
-}
-
-function formatDateInputValue(parts: DateOnlyParts) {
-  return `${parts.year}-${padDatePart(parts.month)}-${padDatePart(parts.day)}`
-}
-
-function addCivilDays(year: number, month: number, day: number, days: number) {
-  const next = new Date(Date.UTC(year, month - 1, day + days))
-
-  return {
-    year: next.getUTCFullYear(),
-    month: next.getUTCMonth() + 1,
-    day: next.getUTCDate()
-  }
-}
-
-function getDateTimeParts(date: Date, timezone: string): DateParts {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23'
-  }).formatToParts(date)
-  const values = Object.fromEntries(
-    parts
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, Number.parseInt(part.value, 10)])
-  ) as Record<'year' | 'month' | 'day' | 'hour' | 'minute' | 'second', number>
-
-  return {
-    year: values.year,
-    month: values.month,
-    day: values.day,
-    hour: values.hour,
-    minute: values.minute,
-    second: values.second
-  }
-}
-
-function getTimeZoneOffsetMs(date: Date, timezone: string) {
-  const parts = getDateTimeParts(date, timezone)
-
-  return (
-    Date.UTC(
-      parts.year,
-      parts.month - 1,
-      parts.day,
-      parts.hour,
-      parts.minute,
-      parts.second
-    ) - date.getTime()
-  )
-}
-
-function zonedDateTimeToUnixSeconds(parts: DateParts, timezone: string) {
-  const utcGuess = new Date(
-    Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
-  )
-  const offset = getTimeZoneOffsetMs(utcGuess, timezone)
-
-  return Math.floor((utcGuess.getTime() - offset) / 1000)
+  return parseDateKey(value)
 }
 
 function buildDashboardUrl(from: DateOnlyParts, to: DateOnlyParts, timezone: string) {
-  const fromTimestamp = zonedDateTimeToUnixSeconds(
-    {
-      ...from,
-      hour: 0,
-      minute: 0,
-      second: 0
-    },
-    timezone
-  )
-  const exclusiveToDate = addCivilDays(to.year, to.month, to.day, 1)
-  const toTimestamp = zonedDateTimeToUnixSeconds(
-    {
-      ...exclusiveToDate,
-      hour: 0,
-      minute: 0,
-      second: 0
-    },
-    timezone
-  )
+  const { fromTimestamp, toTimestamp } = businessDateRangeToUnixSeconds(from, to, timezone)
   const params = new URLSearchParams({
     from: fromTimestamp.toString(),
     to: toTimestamp.toString()
   })
 
-  if (timezone !== 'Asia/Kolkata') {
+  if (timezone !== defaultBusinessTimezone) {
     params.set('timezone', timezone)
   }
 
@@ -143,19 +49,14 @@ function buildDashboardUrl(from: DateOnlyParts, to: DateOnlyParts, timezone: str
 }
 
 function getQuickFilters(timezone: string): QuickFilter[] {
-  const today = getDateTimeParts(new Date(), timezone)
-  const todayDate = {
-    year: today.year,
-    month: today.month,
-    day: today.day
-  }
+  const today = getBusinessDateParts(new Date(), timezone)
   const yesterday = addCivilDays(today.year, today.month, today.day, -1)
 
   return [
     {
       label: 'Today',
-      from: todayDate,
-      to: todayDate
+      from: today,
+      to: today
     },
     {
       label: 'Yesterday',
@@ -165,27 +66,27 @@ function getQuickFilters(timezone: string): QuickFilter[] {
     {
       label: 'Last Week',
       from: addCivilDays(today.year, today.month, today.day, -6),
-      to: todayDate
+      to: today
     },
     {
       label: 'Last Month',
       from: addCivilDays(today.year, today.month, today.day, -29),
-      to: todayDate
+      to: today
     },
     {
       label: 'Last 3 months',
       from: addCivilDays(today.year, today.month, today.day, -89),
-      to: todayDate
+      to: today
     },
     {
       label: 'Last 6 months',
       from: addCivilDays(today.year, today.month, today.day, -179),
-      to: todayDate
+      to: today
     },
     {
       label: 'Last Year',
       from: addCivilDays(today.year, today.month, today.day, -364),
-      to: todayDate
+      to: today
     }
   ]
 }
@@ -197,22 +98,10 @@ function dateInputToUnixSeconds(value: string, timezone: string, boundary: 'star
     return null
   }
 
-  const date =
-    boundary === 'end'
-      ? addCivilDays(parsed.year, parsed.month, parsed.day, 1)
-      : parsed
+  const range = businessDateToRange(parsed, timezone)
+  const date = boundary === 'start' ? range.startAt : range.endAt
 
-  return zonedDateTimeToUnixSeconds(
-    {
-      year: date.year,
-      month: date.month,
-      day: date.day,
-      hour: 0,
-      minute: 0,
-      second: 0
-    },
-    timezone
-  )
+  return Math.floor(date.getTime() / 1000)
 }
 
 export default function AdminDashboardDateFilter({
@@ -242,7 +131,7 @@ export default function AdminDashboardDateFilter({
       to: toTimestamp.toString()
     })
 
-    if (timezone !== 'Asia/Kolkata') {
+    if (timezone !== defaultBusinessTimezone) {
       params.set('timezone', timezone)
     }
 
@@ -254,8 +143,8 @@ export default function AdminDashboardDateFilter({
       <div className="mb-4 flex flex-wrap gap-2">
         {quickFilters.map((filter) => {
           const isActive =
-            fromDate === formatDateInputValue(filter.from) &&
-            toDate === formatDateInputValue(filter.to)
+            fromDate === formatDateKey(filter.from) &&
+            toDate === formatDateKey(filter.to)
 
           return (
             <Button

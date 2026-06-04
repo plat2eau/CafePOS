@@ -1,4 +1,15 @@
 import type { Database } from '@/lib/database.types'
+import {
+  businessDateToRange,
+  businessDayStartHour,
+  formatDateKey,
+  getBusinessDateKey,
+  getBusinessDateLabel,
+  getBusinessDateParts,
+  getDateTimeParts,
+  normalizeBusinessTimezone,
+  parseDateKey
+} from '@/lib/business-day'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export type AdminOrderItem = {
@@ -158,133 +169,6 @@ export type AdminDashboardData = {
   }
 }
 
-type TimeZoneDateParts = {
-  year: number
-  month: number
-  day: number
-  hour: number
-  minute: number
-  second: number
-}
-
-const timeFormatterCache = new Map<string, Intl.DateTimeFormat>()
-const defaultDashboardTimezone = 'Asia/Kolkata'
-
-function normalizeTimezone(timezone?: string | null) {
-  const candidate = timezone?.trim() || defaultDashboardTimezone
-
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format(new Date())
-    return candidate
-  } catch {
-    return defaultDashboardTimezone
-  }
-}
-
-function getTimeFormatter(timezone: string) {
-  const key = `parts:${timezone}`
-
-  if (!timeFormatterCache.has(key)) {
-    timeFormatterCache.set(
-      key,
-      new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hourCycle: 'h23'
-      })
-    )
-  }
-
-  return timeFormatterCache.get(key)!
-}
-
-function getDateLabelFormatter(timezone: string) {
-  const key = `label:${timezone}`
-
-  if (!timeFormatterCache.has(key)) {
-    timeFormatterCache.set(
-      key,
-      new Intl.DateTimeFormat('en-IN', {
-        timeZone: timezone,
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      })
-    )
-  }
-
-  return timeFormatterCache.get(key)!
-}
-
-function getDateTimeParts(date: Date, timezone: string): TimeZoneDateParts {
-  const parts = getTimeFormatter(timezone).formatToParts(date)
-  const values = Object.fromEntries(
-    parts
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, Number.parseInt(part.value, 10)])
-  ) as Record<'year' | 'month' | 'day' | 'hour' | 'minute' | 'second', number>
-
-  return {
-    year: values.year,
-    month: values.month,
-    day: values.day,
-    hour: values.hour,
-    minute: values.minute,
-    second: values.second
-  }
-}
-
-function getTimeZoneOffsetMs(date: Date, timezone: string) {
-  const parts = getDateTimeParts(date, timezone)
-
-  return (
-    Date.UTC(
-      parts.year,
-      parts.month - 1,
-      parts.day,
-      parts.hour,
-      parts.minute,
-      parts.second
-    ) - date.getTime()
-  )
-}
-
-function zonedDateTimeToUtc(parts: TimeZoneDateParts, timezone: string) {
-  const utcGuess = new Date(
-    Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
-  )
-  const offset = getTimeZoneOffsetMs(utcGuess, timezone)
-
-  return new Date(utcGuess.getTime() - offset)
-}
-
-function addCivilDays(year: number, month: number, day: number, days: number) {
-  const next = new Date(Date.UTC(year, month - 1, day + days))
-
-  return {
-    year: next.getUTCFullYear(),
-    month: next.getUTCMonth() + 1,
-    day: next.getUTCDate()
-  }
-}
-
-function padDatePart(value: number) {
-  return value.toString().padStart(2, '0')
-}
-
-function formatDateKey(parts: Pick<TimeZoneDateParts, 'year' | 'month' | 'day'>) {
-  return `${parts.year}-${padDatePart(parts.month)}-${padDatePart(parts.day)}`
-}
-
-function getDateKey(date: Date, timezone: string) {
-  return formatDateKey(getDateTimeParts(date, timezone))
-}
-
 function toUnixSeconds(date: Date) {
   return Math.floor(date.getTime() / 1000)
 }
@@ -303,43 +187,21 @@ function parseUnixSeconds(value?: number | string | null) {
   return Math.floor(parsed > 9999999999 ? parsed / 1000 : parsed)
 }
 
-function buildRangeLabel(fromDate: Date, toDate: Date, timezone: string) {
-  const formatter = getDateLabelFormatter(timezone)
+function buildRangeLabel(fromDateKey: string, toDateKey: string, timezone: string) {
+  const fromLabel = getBusinessDateLabel(fromDateKey, timezone)
 
-  if (getDateKey(fromDate, timezone) === getDateKey(toDate, timezone)) {
-    return formatter.format(fromDate)
+  if (fromDateKey === toDateKey) {
+    return fromLabel
   }
 
-  return `${formatter.format(fromDate)} - ${formatter.format(toDate)}`
+  return `${fromLabel} - ${getBusinessDateLabel(toDateKey, timezone)}`
 }
 
 function getTodayDashboardRange(timezone: string, isFallback = false): AdminDashboardRange {
   const now = new Date()
-  const today = getDateTimeParts(now, timezone)
-  const tomorrow = addCivilDays(today.year, today.month, today.day, 1)
+  const today = getBusinessDateParts(now, timezone)
   const fromDate = formatDateKey(today)
-  const startAt = zonedDateTimeToUtc(
-    {
-      year: today.year,
-      month: today.month,
-      day: today.day,
-      hour: 0,
-      minute: 0,
-      second: 0
-    },
-    timezone
-  )
-  const endAt = zonedDateTimeToUtc(
-    {
-      year: tomorrow.year,
-      month: tomorrow.month,
-      day: tomorrow.day,
-      hour: 0,
-      minute: 0,
-      second: 0
-    },
-    timezone
-  )
+  const { startAt, endAt } = businessDateToRange(today, timezone)
 
   return {
     timezone,
@@ -349,7 +211,7 @@ function getTodayDashboardRange(timezone: string, isFallback = false): AdminDash
     toTimestamp: toUnixSeconds(endAt),
     startAt: startAt.toISOString(),
     endAt: endAt.toISOString(),
-    label: getDateLabelFormatter(timezone).format(now),
+    label: getBusinessDateLabel(fromDate, timezone),
     isFallback
   }
 }
@@ -359,7 +221,7 @@ function resolveDashboardRange(options?: {
   toTimestamp?: number | string | null
   timezone?: string
 }) {
-  const timezone = normalizeTimezone(options?.timezone)
+  const timezone = normalizeBusinessTimezone(options?.timezone)
   const fromTimestamp = parseUnixSeconds(options?.fromTimestamp)
   const toTimestamp = parseUnixSeconds(options?.toTimestamp)
 
@@ -379,16 +241,18 @@ function resolveDashboardRange(options?: {
   }
 
   const displayEndAt = new Date(endAt.getTime() - 1)
+  const fromDate = getBusinessDateKey(startAt, timezone)
+  const toDate = getBusinessDateKey(displayEndAt, timezone)
 
   return {
     timezone,
-    fromDate: getDateKey(startAt, timezone),
-    toDate: getDateKey(displayEndAt, timezone),
+    fromDate,
+    toDate,
     fromTimestamp,
     toTimestamp,
     startAt: startAt.toISOString(),
     endAt: endAt.toISOString(),
-    label: buildRangeLabel(startAt, displayEndAt, timezone),
+    label: buildRangeLabel(fromDate, toDate, timezone),
     isFallback: false
   }
 }
@@ -408,24 +272,18 @@ function getHourLabel(hour: number) {
   return `${normalizedHour} ${suffix}`
 }
 
-function parseDateKey(value: string) {
-  const [year, month, day] = value.split('-').map((part) => Number.parseInt(part, 10))
-
-  if (!year || !month || !day) {
-    return null
-  }
-
-  return { year, month, day }
-}
-
 function createTrendPoints(range: AdminDashboardRange): AdminDashboardTrendPoint[] {
   if (range.fromDate === range.toDate) {
-    return Array.from({ length: 24 }, (_, hour) => ({
-      key: hour.toString(),
-      label: getHourLabel(hour),
-      revenueCents: 0,
-      orderCount: 0
-    }))
+    return Array.from({ length: 24 }, (_, index) => {
+      const hour = (businessDayStartHour + index) % 24
+
+      return {
+        key: hour.toString(),
+        label: getHourLabel(hour),
+        revenueCents: 0,
+        orderCount: 0
+      }
+    })
   }
 
   const from = parseDateKey(range.fromDate)
@@ -438,7 +296,6 @@ function createTrendPoints(range: AdminDashboardRange): AdminDashboardTrendPoint
   const points: AdminDashboardTrendPoint[] = []
   const cursor = new Date(Date.UTC(from.year, from.month - 1, from.day))
   const end = new Date(Date.UTC(to.year, to.month - 1, to.day))
-  const formatter = getDateLabelFormatter(range.timezone)
 
   while (cursor.getTime() <= end.getTime()) {
     const key = formatDateKey({
@@ -447,21 +304,9 @@ function createTrendPoints(range: AdminDashboardRange): AdminDashboardTrendPoint
       day: cursor.getUTCDate()
     })
 
-    const labelDate = zonedDateTimeToUtc(
-      {
-        year: cursor.getUTCFullYear(),
-        month: cursor.getUTCMonth() + 1,
-        day: cursor.getUTCDate(),
-        hour: 12,
-        minute: 0,
-        second: 0
-      },
-      range.timezone
-    )
-
     points.push({
       key,
-      label: formatter.format(labelDate),
+      label: getBusinessDateLabel(key, range.timezone),
       revenueCents: 0,
       orderCount: 0
     })
@@ -598,7 +443,7 @@ export async function getAdminDashboardData(options?: {
   toTimestamp?: number | string | null
   timezone?: string
 }): Promise<AdminDashboardData> {
-  const timezone = normalizeTimezone(options?.timezone)
+  const timezone = normalizeBusinessTimezone(options?.timezone)
   const range = resolveDashboardRange({
     fromTimestamp: options?.fromTimestamp,
     toTimestamp: options?.toTimestamp,
@@ -756,7 +601,7 @@ export async function getAdminDashboardData(options?: {
     const trendKey =
       trendGranularity === 'hour'
         ? getDateTimeParts(orderDate, timezone).hour.toString()
-        : getDateKey(orderDate, timezone)
+        : getBusinessDateKey(orderDate, timezone)
     const trendPoint = trendPointByKey.get(trendKey)
 
     if (trendPoint) {
