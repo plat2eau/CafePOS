@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { apiError, unauthorizedApiError } from '@/lib/api-errors'
 import { createReceiptToken } from '@/lib/receipt-print-server'
 import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -15,7 +16,7 @@ export async function POST(request: Request, context: RouteContext) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json({ message: 'Unauthorized.' }, { status: 401 })
+    return unauthorizedApiError()
   }
 
   const { orderId } = await context.params
@@ -30,7 +31,11 @@ export async function POST(request: Request, context: RouteContext) {
     .maybeSingle()
 
   if (orderError || !order) {
-    return NextResponse.json({ message: 'That order could not be found.' }, { status: 404 })
+    return apiError('That order could not be found.', 404, {
+      code: 'order_not_found',
+      context: 'admin.orders.receiptToken.post.loadOrder',
+      cause: orderError
+    })
   }
 
   const { data: orderItems, error: orderItemsError } = await supabase
@@ -39,7 +44,11 @@ export async function POST(request: Request, context: RouteContext) {
     .eq('order_id', orderId)
 
   if (orderItemsError) {
-    return NextResponse.json({ message: 'Could not load the order items.' }, { status: 500 })
+    return apiError('Could not load the order items.', 500, {
+      code: 'order_items_load_failed',
+      context: 'admin.orders.receiptToken.post.loadItems',
+      cause: orderItemsError
+    })
   }
 
   const receiptPayload = buildReceiptPayloadForOrders({

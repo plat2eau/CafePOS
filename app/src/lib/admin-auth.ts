@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { logApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 
@@ -65,6 +66,7 @@ export async function getAdminAuthContext(
   const user = sessionData.user
 
   if (sessionError || !user) {
+    logApiError('adminAuth.getAdminAuthContext.setSession', sessionError)
     if (options.clearInvalidSession) {
       await clearAdminAuthCookies()
     }
@@ -88,6 +90,7 @@ export async function getAdminAuthContext(
     .maybeSingle()
 
   if (profileError || !profile) {
+    logApiError('adminAuth.getAdminAuthContext.staffProfile', profileError)
     if (options.clearInvalidSession) {
       await clearAdminAuthCookies()
     }

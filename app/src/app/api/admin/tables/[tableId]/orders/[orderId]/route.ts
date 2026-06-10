@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { apiError, unauthorizedApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 
@@ -19,7 +20,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json({ message: 'Unauthorized.' }, { status: 401 })
+    return unauthorizedApiError()
   }
 
   const { tableId, orderId } = await context.params
@@ -27,7 +28,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const nextStatus = body?.status
 
   if (!nextStatus || !allowedOrderStatuses.includes(nextStatus)) {
-    return NextResponse.json({ message: 'Invalid order status.' }, { status: 400 })
+    return apiError('Invalid order status.', 400, { code: 'invalid_order_status' })
   }
 
   const supabase = createServerSupabaseClient()
@@ -39,10 +40,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     .maybeSingle()
 
   if (orderError || !order) {
-    return NextResponse.json(
-      { message: 'That order could not be found for this table.' },
-      { status: 404 }
-    )
+    return apiError('That order could not be found for this table.', 404, {
+      code: 'order_not_found',
+      context: 'admin.tables.orders.patch.loadOrder',
+      cause: orderError
+    })
   }
 
   const { error: updateError } = await supabase
@@ -54,10 +56,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     .eq('id', orderId)
 
   if (updateError) {
-    return NextResponse.json(
-      { message: 'Could not update the order status.' },
-      { status: 500 }
-    )
+    return apiError('Could not update the order status.', 500, {
+      code: 'order_status_update_failed',
+      context: 'admin.tables.orders.patch.updateOrder',
+      cause: updateError
+    })
   }
 
   revalidatePath('/admin/sessions')

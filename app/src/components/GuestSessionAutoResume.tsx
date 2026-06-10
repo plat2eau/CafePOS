@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { apiFetch } from '@/lib/api-client'
 import { getTableSessionStorageKey } from '@/lib/table-session'
 
 type GuestSessionAutoResumeProps = {
@@ -48,8 +49,9 @@ export default function GuestSessionAutoResume({
     let cancelled = false
 
     async function restoreGuestSession() {
-      try {
-        const response = await fetch(`/api/table/${tableId}/session/restore`, {
+      const result = await apiFetch<{ ok: boolean }>(
+        `/api/table/${tableId}/session/restore`,
+        {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -57,20 +59,19 @@ export default function GuestSessionAutoResume({
           body: JSON.stringify({
             sessionId: storedSessionId
           })
-        })
+        },
+        'Could not restore the table session.'
+      )
 
-        if (!response.ok) {
-          window.localStorage.removeItem(storageKey)
-          return
-        }
-
-        if (!cancelled) {
-          startTransition(() => {
-            router.refresh()
-          })
-        }
-      } catch {
+      if (!result.ok) {
         window.localStorage.removeItem(storageKey)
+        return
+      }
+
+      if (!cancelled) {
+        startTransition(() => {
+          router.refresh()
+        })
       }
     }
 

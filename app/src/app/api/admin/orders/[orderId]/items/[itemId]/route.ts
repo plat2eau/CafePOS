@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { apiError, unauthorizedApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 
@@ -32,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json({ message: 'Unauthorized.' }, { status: 401 })
+    return unauthorizedApiError()
   }
 
   const { orderId, itemId } = await context.params
@@ -40,7 +41,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const action = body?.action
 
   if (action !== 'decrement' && action !== 'remove') {
-    return NextResponse.json({ message: 'Invalid item action.' }, { status: 400 })
+    return apiError('Invalid item action.', 400, { code: 'invalid_item_action' })
   }
 
   const supabase = createServerSupabaseClient()
@@ -52,7 +53,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     .maybeSingle()
 
   if (orderError || !order) {
-    return NextResponse.json({ message: 'That order could not be found.' }, { status: 404 })
+    return apiError('That order could not be found.', 404, {
+      code: 'order_not_found',
+      context: 'admin.orders.items.patch.loadOrder',
+      cause: orderError
+    })
   }
 
   const { data: orderItem, error: itemError } = await supabase
@@ -63,11 +68,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     .maybeSingle()
 
   if (itemError || !orderItem) {
-    return NextResponse.json({ message: 'That order item could not be found.' }, { status: 404 })
+    return apiError('That order item could not be found.', 404, {
+      code: 'order_item_not_found',
+      context: 'admin.orders.items.patch.loadOrderItem',
+      cause: itemError
+    })
   }
 
   if (!Number.isInteger(orderItem.quantity) || orderItem.quantity <= 0) {
-    return NextResponse.json({ message: 'That order item has an invalid quantity.' }, { status: 400 })
+    return apiError('That order item has an invalid quantity.', 400, {
+      code: 'invalid_order_item_quantity'
+    })
   }
 
   if (action === 'decrement' && orderItem.quantity > 1) {
@@ -81,7 +92,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       .eq('id', itemId)
 
     if (updateItemError) {
-      return NextResponse.json({ message: 'Could not update the order item.' }, { status: 500 })
+      return apiError('Could not update the order item.', 500, {
+        code: 'order_item_update_failed',
+        context: 'admin.orders.items.patch.updateItem',
+        cause: updateItemError
+      })
     }
   } else {
     const { error: deleteItemError } = await supabase
@@ -91,7 +106,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       .eq('order_id', orderId)
 
     if (deleteItemError) {
-      return NextResponse.json({ message: 'Could not remove the order item.' }, { status: 500 })
+      return apiError('Could not remove the order item.', 500, {
+        code: 'order_item_delete_failed',
+        context: 'admin.orders.items.patch.deleteItem',
+        cause: deleteItemError
+      })
     }
   }
 
@@ -101,7 +120,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     .eq('order_id', orderId)
 
   if (remainingItemsError) {
-    return NextResponse.json({ message: 'Could not recalculate the order total.' }, { status: 500 })
+    return apiError('Could not recalculate the order total.', 500, {
+      code: 'order_total_recalculate_failed',
+      context: 'admin.orders.items.patch.remainingItems',
+      cause: remainingItemsError
+    })
   }
 
   const remainingTotalCents = (remainingItems ?? []).reduce(
@@ -120,7 +143,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     .eq('id', orderId)
 
   if (updateOrderError) {
-    return NextResponse.json({ message: 'Could not update the order.' }, { status: 500 })
+    return apiError('Could not update the order.', 500, {
+      code: 'order_update_failed',
+      context: 'admin.orders.items.patch.updateOrder',
+      cause: updateOrderError
+    })
   }
 
   revalidateAdminOrderPaths(order.table_id)

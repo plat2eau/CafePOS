@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { apiFetch } from '@/lib/api-client'
 
 type AdminSessionHeartbeatProps = {
   intervalMs?: number
@@ -16,16 +17,20 @@ export default function AdminSessionHeartbeat({
     let cancelled = false
 
     async function checkSession() {
-      const response = await fetch('/api/admin/session', {
-        method: 'GET',
-        cache: 'no-store'
-      }).catch(() => null)
+      const result = await apiFetch<{ authenticated: boolean }>(
+        '/api/admin/session',
+        {
+          method: 'GET',
+          cache: 'no-store'
+        },
+        'Could not verify the admin session.'
+      )
 
-      if (cancelled || !response) {
+      if (cancelled) {
         return
       }
 
-      if (response.status === 401) {
+      if (!result.ok && result.status === 401) {
         router.replace('/admin/login?error=unauthorized')
         router.refresh()
       }

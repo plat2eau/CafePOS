@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { apiError, unauthorizedApiError } from '@/lib/api-errors'
 import { createReceiptToken } from '@/lib/receipt-print-server'
 import { isReceiptPayload } from '@/lib/receipt-print'
 
@@ -7,13 +8,13 @@ export async function POST(request: Request) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return unauthorizedApiError()
   }
 
   const body = (await request.json().catch(() => null)) as { payload?: unknown } | null
 
   if (!body || !isReceiptPayload(body.payload)) {
-    return NextResponse.json({ message: 'Invalid receipt payload.' }, { status: 400 })
+    return apiError('Invalid receipt payload.', 400, { code: 'invalid_receipt_payload' })
   }
 
   const token = createReceiptToken(body.payload)

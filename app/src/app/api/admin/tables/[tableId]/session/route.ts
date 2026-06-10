@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { apiError, unauthorizedApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 type RouteContext = {
@@ -13,7 +14,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json({ message: 'Unauthorized.' }, { status: 401 })
+    return unauthorizedApiError()
   }
 
   const { tableId } = await context.params
@@ -21,7 +22,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   const sessionId = body?.sessionId?.trim()
 
   if (!sessionId) {
-    return NextResponse.json({ message: 'Missing session id.' }, { status: 400 })
+    return apiError('Missing session id.', 400, { code: 'session_id_required' })
   }
 
   const supabase = createServerSupabaseClient()
@@ -33,17 +34,17 @@ export async function DELETE(request: Request, context: RouteContext) {
     .maybeSingle()
 
   if (sessionError || !session) {
-    return NextResponse.json(
-      { message: 'That session could not be found for this table.' },
-      { status: 404 }
-    )
+    return apiError('That session could not be found for this table.', 404, {
+      code: 'session_not_found',
+      context: 'admin.tables.session.delete.loadSession',
+      cause: sessionError
+    })
   }
 
   if (session.status !== 'active') {
-    return NextResponse.json(
-      { message: 'That table session is already inactive.' },
-      { status: 400 }
-    )
+    return apiError('That table session is already inactive.', 400, {
+      code: 'session_inactive'
+    })
   }
 
   const { error: closeError } = await supabase
@@ -56,10 +57,11 @@ export async function DELETE(request: Request, context: RouteContext) {
     .eq('id', sessionId)
 
   if (closeError) {
-    return NextResponse.json(
-      { message: 'Could not clear the table session.' },
-      { status: 500 }
-    )
+    return apiError('Could not clear the table session.', 500, {
+      code: 'session_close_failed',
+      context: 'admin.tables.session.delete.closeSession',
+      cause: closeError
+    })
   }
 
   const { error: archiveOrdersError } = await supabase
@@ -72,10 +74,11 @@ export async function DELETE(request: Request, context: RouteContext) {
     .is('archived_at', null)
 
   if (archiveOrdersError) {
-    return NextResponse.json(
-      { message: 'Table closed, but the session orders could not be archived.' },
-      { status: 500 }
-    )
+    return apiError('Table closed, but the session orders could not be archived.', 500, {
+      code: 'session_orders_archive_failed',
+      context: 'admin.tables.session.delete.archiveOrders',
+      cause: archiveOrdersError
+    })
   }
 
   const { error: resolveRequestsError } = await supabase
@@ -88,10 +91,11 @@ export async function DELETE(request: Request, context: RouteContext) {
     .eq('status', 'open')
 
   if (resolveRequestsError) {
-    return NextResponse.json(
-      { message: 'Table closed, but the service requests could not be resolved.' },
-      { status: 500 }
-    )
+    return apiError('Table closed, but the service requests could not be resolved.', 500, {
+      code: 'service_requests_resolve_failed',
+      context: 'admin.tables.session.delete.resolveRequests',
+      cause: resolveRequestsError
+    })
   }
 
   revalidatePath('/admin/sessions')

@@ -133,6 +133,7 @@ export type Database = {
           note: string | null
           ordered_by_name: string
           ordered_by_phone: string
+          order_type: 'table' | 'out'
           session_id: string | null
           status: 'placed' | 'preparing' | 'served' | 'cancelled'
           table_id: string | null
@@ -146,6 +147,7 @@ export type Database = {
           note?: string | null
           ordered_by_name: string
           ordered_by_phone: string
+          order_type?: 'table' | 'out'
           session_id?: string | null
           status?: 'placed' | 'preparing' | 'served' | 'cancelled'
           table_id?: string | null
@@ -159,6 +161,7 @@ export type Database = {
           note?: string | null
           ordered_by_name?: string
           ordered_by_phone?: string
+          order_type?: 'table' | 'out'
           session_id?: string | null
           status?: 'placed' | 'preparing' | 'served' | 'cancelled'
           table_id?: string | null

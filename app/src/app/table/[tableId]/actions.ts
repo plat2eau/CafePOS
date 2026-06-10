@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
+import { logApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   getTableOrderIdentityCookieName,
@@ -113,6 +114,7 @@ export async function createOrRefreshTableSession(
     .maybeSingle()
 
   if (tableError || !table) {
+    logApiError('table.actions.createOrRefresh.loadTable', tableError)
     return {
       status: 'error',
       message: 'This table does not exist in the database yet.'
@@ -134,6 +136,7 @@ export async function createOrRefreshTableSession(
     .maybeSingle()
 
   if (existingSessionError) {
+    logApiError('table.actions.createOrRefresh.loadExistingSession', existingSessionError)
     return {
       status: 'error',
       message: 'Could not check the current session for this table.'
@@ -192,6 +195,7 @@ export async function createOrRefreshTableSession(
         .single()
 
   if (sessionMutation.error || !sessionMutation.data) {
+    logApiError('table.actions.createOrRefresh.saveSession', sessionMutation.error)
     return {
       status: 'error',
       message: 'Could not save the guest session. Please try again.'
@@ -259,6 +263,7 @@ export async function placeOrderForTable(
     .maybeSingle()
 
   if (sessionError || !session) {
+    logApiError('table.actions.placeOrder.loadSession', sessionError)
     return {
       status: 'error',
       message: 'Your session is no longer active. Please refresh your session and try again.'
@@ -286,6 +291,7 @@ export async function placeOrderForTable(
     .in('id', uniqueItemIds)
 
   if (menuItemsError || !menuItems) {
+    logApiError('table.actions.placeOrder.loadMenuItems', menuItemsError)
     return {
       status: 'error',
       message: 'Could not validate the selected menu items.'
@@ -346,7 +352,8 @@ export async function placeOrderForTable(
         line_total_cents: lineTotalCents
       }
     })
-  } catch {
+  } catch (error) {
+    logApiError('table.actions.placeOrder.normalizeItems', error)
     return {
       status: 'error',
       message: 'One or more selected items are unavailable.'
@@ -374,6 +381,7 @@ export async function placeOrderForTable(
     .single()
 
   if (orderError || !createdOrder) {
+    logApiError('table.actions.placeOrder.createOrder', orderError)
     return {
       status: 'error',
       message: 'Could not create the order. Please try again.'
@@ -390,7 +398,11 @@ export async function placeOrderForTable(
     )
 
   if (orderItemsError) {
-    await supabase.from('orders').delete().eq('id', createdOrder.id)
+    const { error: cleanupError } = await supabase.from('orders').delete().eq('id', createdOrder.id)
+    if (cleanupError) {
+      logApiError('table.actions.placeOrder.cleanupOrderAfterItemsFailure', cleanupError)
+    }
+    logApiError('table.actions.placeOrder.createOrderItems', orderItemsError)
 
     return {
       status: 'error',
@@ -398,12 +410,15 @@ export async function placeOrderForTable(
     }
   }
 
-  await supabase
+  const { error: touchSessionError } = await supabase
     .from('table_sessions')
     .update({
       last_active_at: new Date().toISOString()
     })
     .eq('id', session.id)
+  if (touchSessionError) {
+    logApiError('table.actions.placeOrder.touchSession', touchSessionError)
+  }
 
   revalidatePath(`/table/${tableId}`)
   revalidatePath(`/table/${tableId}/orders`)
@@ -451,6 +466,7 @@ export async function createServiceRequestForTable(
     .maybeSingle()
 
   if (sessionError || !session) {
+    logApiError('table.actions.createServiceRequest.loadSession', sessionError)
     return {
       status: 'error',
       message: 'Your session is no longer active. Please refresh and try again.'
@@ -467,18 +483,22 @@ export async function createServiceRequestForTable(
     })
 
   if (requestError) {
+    logApiError('table.actions.createServiceRequest.createRequest', requestError)
     return {
       status: 'error',
       message: 'Could not notify the staff right now. Please try again.'
     }
   }
 
-  await supabase
+  const { error: touchSessionError } = await supabase
     .from('table_sessions')
     .update({
       last_active_at: new Date().toISOString()
     })
     .eq('id', session.id)
+  if (touchSessionError) {
+    logApiError('table.actions.createServiceRequest.touchSession', touchSessionError)
+  }
 
   revalidatePath(`/table/${tableId}`)
   revalidatePath('/admin/sessions')

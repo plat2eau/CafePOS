@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ActionGroup } from '@/components/ui/action-group'
 import { Button } from '@/components/ui/button'
+import { apiFetch } from '@/lib/api-client'
 
 type ReceiptPrintActionsProps = {
   responsePath: string
@@ -12,13 +13,21 @@ export default function ReceiptPrintActions({ responsePath }: ReceiptPrintAction
   const [launchMessage, setLaunchMessage] = useState<string | null>(null)
 
   async function loadBluetoothPrintJson(responseUrl: URL) {
-    try {
-      const response = await fetch(responseUrl.toString())
-      const bluetoothPrintJson = await response.json()
-      console.log('Bluetooth print JSON', bluetoothPrintJson)
-    } catch (error) {
-      console.error('Could not load Bluetooth print JSON before launch.', error)
+    const result = await apiFetch<unknown>(
+      responseUrl.toString(),
+      {
+        method: 'GET',
+        cache: 'no-store'
+      },
+      'Could not load Bluetooth print JSON before launch.'
+    )
+
+    if (!result.ok) {
+      setLaunchMessage(result.message)
+      return
     }
+
+    console.log('Bluetooth print JSON', result.data)
   }
 
   async function handleAndroidBluetoothPrintLaunch() {

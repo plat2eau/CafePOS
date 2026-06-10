@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { apiError, unauthorizedApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 type RouteContext = {
@@ -13,7 +14,7 @@ export async function POST(_request: Request, context: RouteContext) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json({ message: 'Unauthorized.' }, { status: 401 })
+    return unauthorizedApiError()
   }
 
   const { orderId } = await context.params
@@ -26,18 +27,21 @@ export async function POST(_request: Request, context: RouteContext) {
     .maybeSingle()
 
   if (orderError || !order) {
-    return NextResponse.json({ message: 'That order could not be found.' }, { status: 404 })
+    return apiError('That order could not be found.', 404, {
+      code: 'order_not_found',
+      context: 'admin.orders.closeOut.post.loadOrder',
+      cause: orderError
+    })
   }
 
   if (order.table_id) {
-    return NextResponse.json(
-      { message: 'That order belongs to a table. Close the table session instead.' },
-      { status: 400 }
-    )
+    return apiError('That order belongs to a table. Close the table session instead.', 400, {
+      code: 'table_order_close_out_forbidden'
+    })
   }
 
   if (order.archived_at) {
-    return NextResponse.json({ message: 'That order is already closed out.' }, { status: 400 })
+    return apiError('That order is already closed out.', 400, { code: 'order_already_closed' })
   }
 
   const now = new Date().toISOString()
@@ -54,7 +58,11 @@ export async function POST(_request: Request, context: RouteContext) {
     .is('archived_at', null)
 
   if (updateError) {
-    return NextResponse.json({ message: 'Could not close out the order.' }, { status: 500 })
+    return apiError('Could not close out the order.', 500, {
+      code: 'order_close_out_failed',
+      context: 'admin.orders.closeOut.post.updateOrder',
+      cause: updateError
+    })
   }
 
   revalidatePath('/admin/sessions')

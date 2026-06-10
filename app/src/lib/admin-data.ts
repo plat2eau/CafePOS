@@ -10,6 +10,7 @@ import {
   normalizeBusinessTimezone,
   parseDateKey
 } from '@/lib/business-day'
+import { logApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export type AdminOrderItem = {
@@ -316,6 +317,11 @@ function createTrendPoints(range: AdminDashboardRange): AdminDashboardTrendPoint
   return points
 }
 
+function throwDataLoadError(context: string, message: string, cause?: unknown): never {
+  logApiError(context, cause)
+  throw new Error(message)
+}
+
 async function fetchOrdersWithItems(options?: {
   tableId?: string
   sessionId?: string
@@ -344,7 +350,7 @@ async function fetchOrdersWithItems(options?: {
     : { data: [], error: null }
 
   if (ordersError) {
-    throw new Error('Could not load orders.')
+    throwDataLoadError('adminData.fetchOrdersWithItems.orders', 'Could not load orders.', ordersError)
   }
 
   const sessionIds = Array.from(
@@ -372,7 +378,14 @@ async function fetchOrdersWithItems(options?: {
   ])
 
   if (orderItemsError || sessionDetailsError) {
-    throw new Error('Could not load order details.')
+    if (orderItemsError) {
+      logApiError('adminData.fetchOrdersWithItems.orderItems', orderItemsError)
+    }
+    throwDataLoadError(
+      'adminData.fetchOrdersWithItems.sessionDetails',
+      'Could not load order details.',
+      sessionDetailsError
+    )
   }
 
   const sessionNameById = new Map(
@@ -406,7 +419,11 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     .order('last_active_at', { ascending: false })
 
   if (sessionsError) {
-    throw new Error('Could not load active sessions.')
+    throwDataLoadError(
+      'adminData.getAdminOverviewData.sessions',
+      'Could not load active sessions.',
+      sessionsError
+    )
   }
 
   const activeSessionIds = (sessions ?? []).map((session) => session.id)
@@ -422,7 +439,11 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     : { data: [], error: null }
 
   if (serviceRequestsError) {
-    throw new Error('Could not load service requests.')
+    throwDataLoadError(
+      'adminData.getAdminOverviewData.serviceRequests',
+      'Could not load service requests.',
+      serviceRequestsError
+    )
   }
 
   const sessionNameById = new Map((sessions ?? []).map((session) => [session.id, session.guest_name]))
@@ -472,15 +493,27 @@ export async function getAdminDashboardData(options?: {
   ])
 
   if (ordersResult.error) {
-    throw new Error('Could not load dashboard orders.')
+    throwDataLoadError(
+      'adminData.getAdminDashboardData.orders',
+      'Could not load dashboard orders.',
+      ordersResult.error
+    )
   }
 
   if (sessionsResult.error) {
-    throw new Error('Could not load dashboard sessions.')
+    throwDataLoadError(
+      'adminData.getAdminDashboardData.sessions',
+      'Could not load dashboard sessions.',
+      sessionsResult.error
+    )
   }
 
   if (serviceRequestsResult.error) {
-    throw new Error('Could not load dashboard service requests.')
+    throwDataLoadError(
+      'adminData.getAdminDashboardData.serviceRequests',
+      'Could not load dashboard service requests.',
+      serviceRequestsResult.error
+    )
   }
 
   const orders = ordersResult.data ?? []
@@ -497,7 +530,11 @@ export async function getAdminDashboardData(options?: {
     : { data: [], error: null }
 
   if (orderItemsResult.error) {
-    throw new Error('Could not load dashboard order items.')
+    throwDataLoadError(
+      'adminData.getAdminDashboardData.orderItems',
+      'Could not load dashboard order items.',
+      orderItemsResult.error
+    )
   }
 
   const orderSessionIds = Array.from(
@@ -515,7 +552,11 @@ export async function getAdminDashboardData(options?: {
     : { data: [], error: null }
 
   if (orderSessionsResult.error) {
-    throw new Error('Could not load dashboard order guests.')
+    throwDataLoadError(
+      'adminData.getAdminDashboardData.orderSessions',
+      'Could not load dashboard order guests.',
+      orderSessionsResult.error
+    )
   }
 
   const sessionGuestById = new Map(
@@ -714,7 +755,7 @@ export async function getAdminMenuItems(): Promise<AdminMenuItem[]> {
     .order('sort_order', { ascending: true })
 
   if (error) {
-    throw new Error('Could not load menu items.')
+    throwDataLoadError('adminData.getAdminMenuItems', 'Could not load menu items.', error)
   }
 
   return data ?? []
@@ -728,7 +769,7 @@ export async function getAdminMenuCategories(): Promise<AdminMenuCategory[]> {
     .order('sort_order', { ascending: true })
 
   if (error) {
-    throw new Error('Could not load menu categories.')
+    throwDataLoadError('adminData.getAdminMenuCategories', 'Could not load menu categories.', error)
   }
 
   return data ?? []
@@ -743,7 +784,7 @@ export async function getAdminTableOptions(): Promise<AdminTableOption[]> {
     .order('label', { ascending: true })
 
   if (error) {
-    throw new Error('Could not load tables.')
+    throwDataLoadError('adminData.getAdminTableOptions', 'Could not load tables.', error)
   }
 
   return data ?? []

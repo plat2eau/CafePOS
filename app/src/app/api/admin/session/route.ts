@@ -4,6 +4,7 @@ import {
   getAdminAuthContext,
   setAdminAuthCookies
 } from '@/lib/admin-auth'
+import { apiError, logApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 type SessionRequestBody = {
@@ -12,17 +13,12 @@ type SessionRequestBody = {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as SessionRequestBody
-  const accessToken = body.accessToken?.trim()
-  const refreshToken = body.refreshToken?.trim()
+  const body = (await request.json().catch(() => null)) as SessionRequestBody | null
+  const accessToken = body?.accessToken?.trim()
+  const refreshToken = body?.refreshToken?.trim()
 
   if (!accessToken || !refreshToken) {
-    return NextResponse.json(
-      {
-        message: 'Missing auth session tokens.'
-      },
-      { status: 400 }
-    )
+    return apiError('Missing auth session tokens.', 400, { code: 'missing_auth_tokens' })
   }
 
   const supabase = createServerSupabaseClient()
@@ -32,12 +28,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser(accessToken)
 
   if (userError || !user) {
-    return NextResponse.json(
-      {
-        message: 'Could not verify this Supabase session.'
-      },
-      { status: 401 }
-    )
+    return apiError('Could not verify this Supabase session.', 401, {
+      code: 'supabase_session_invalid',
+      context: 'admin.session.post.getUser',
+      cause: userError
+    })
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -47,12 +42,10 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (profileError || !profile) {
-    return NextResponse.json(
-      {
-        message: 'This account does not have staff access yet.'
-      },
-      { status: 403 }
-    )
+    logApiError('admin.session.post.staffProfile', profileError)
+    return apiError('This account does not have staff access yet.', 403, {
+      code: 'staff_access_missing'
+    })
   }
 
   await setAdminAuthCookies(accessToken, refreshToken)

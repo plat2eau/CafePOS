@@ -6,6 +6,7 @@ import { Button, ButtonSpinner } from '@/components/ui/button'
 import { FlashMessage } from '@/components/ui/flash-message'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { apiFetch } from '@/lib/api-client'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 type AdminLoginFormProps = {
@@ -38,7 +39,10 @@ export default function AdminLoginForm({ initialError }: AdminLoginFormProps) {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
-    })
+    }).catch((signInError: unknown) => ({
+      data: { session: null, user: null },
+      error: signInError instanceof Error ? signInError : new Error('Could not sign in right now.')
+    }))
 
     if (error || !data.session) {
       setMessage(error?.message ?? 'Could not sign in right now.')
@@ -46,21 +50,24 @@ export default function AdminLoginForm({ initialError }: AdminLoginFormProps) {
       return
     }
 
-    const response = await fetch('/api/admin/session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+    const result = await apiFetch<{ ok: boolean }>(
+      '/api/admin/session',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token
+        })
       },
-      body: JSON.stringify({
-        accessToken: data.session.access_token,
-        refreshToken: data.session.refresh_token
-      })
-    })
+      'This account is not allowed into the admin area.'
+    )
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as { message?: string } | null
+    if (!result.ok) {
       await supabase.auth.signOut()
-      setMessage(payload?.message ?? 'This account is not allowed into the admin area.')
+      setMessage(result.message)
       setIsSubmitting(false)
       return
     }

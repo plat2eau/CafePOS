@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiError } from '@/lib/api-errors'
 import { buildBluetoothPrintJson } from '@/lib/receipt-print'
 import { verifyReceiptToken } from '@/lib/receipt-print-server'
 
@@ -7,13 +8,13 @@ export async function GET(request: Request) {
   const token = searchParams.get('token')
 
   if (!token) {
-    return NextResponse.json({ message: 'Missing token.' }, { status: 400 })
+    return apiError('Missing token.', 400, { code: 'receipt_token_required' })
   }
 
   const payload = verifyReceiptToken(token)
 
   if (!payload) {
-    return NextResponse.json({ message: 'Invalid or expired token.' }, { status: 401 })
+    return apiError('Invalid or expired token.', 401, { code: 'receipt_token_invalid' })
   }
 
   return NextResponse.json(buildBluetoothPrintJson(payload))

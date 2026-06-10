@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireAdminAuth } from '@/lib/admin-auth'
+import { logApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 
@@ -36,6 +37,7 @@ export async function updateOrderStatus(
     .maybeSingle()
 
   if (orderError || !order) {
+    logApiError('admin.sessions.actions.updateOrderStatus.loadOrder', orderError)
     redirect(`/admin/sessions/${tableId}?error=order-not-found`)
   }
 
@@ -48,6 +50,7 @@ export async function updateOrderStatus(
     .eq('id', orderId)
 
   if (updateError) {
+    logApiError('admin.sessions.actions.updateOrderStatus.updateOrder', updateError)
     redirect(`/admin/sessions/${tableId}?error=order-update-failed`)
   }
 
@@ -67,6 +70,7 @@ export async function clearTableSession(tableId: string, sessionId: string) {
     .maybeSingle()
 
   if (sessionError || !session) {
+    logApiError('admin.sessions.actions.clearTableSession.loadSession', sessionError)
     redirect(`/admin/sessions/${tableId}?error=session-not-found`)
   }
 
@@ -84,6 +88,7 @@ export async function clearTableSession(tableId: string, sessionId: string) {
     .eq('id', sessionId)
 
   if (closeError) {
+    logApiError('admin.sessions.actions.clearTableSession.closeSession', closeError)
     redirect(`/admin/sessions/${tableId}?error=clear-failed`)
   }
 
@@ -97,6 +102,7 @@ export async function clearTableSession(tableId: string, sessionId: string) {
     .is('archived_at', null)
 
   if (archiveOrdersError) {
+    logApiError('admin.sessions.actions.clearTableSession.archiveOrders', archiveOrdersError)
     redirect(`/admin/sessions/${tableId}?error=clear-failed`)
   }
 
@@ -110,6 +116,7 @@ export async function clearTableSession(tableId: string, sessionId: string) {
     .eq('status', 'open')
 
   if (resolveRequestsError) {
+    logApiError('admin.sessions.actions.clearTableSession.resolveRequests', resolveRequestsError)
     redirect(`/admin/sessions/${tableId}?error=clear-failed`)
   }
 

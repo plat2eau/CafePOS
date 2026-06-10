@@ -27,6 +27,7 @@ import { SummaryRow } from '@/components/ui/summary-row'
 import { Textarea } from '@/components/ui/textarea'
 import { searchMenuItems } from '@/lib/menu-search'
 import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
+import { apiFetch } from '@/lib/api-client'
 import type {
   AdminMenuCategory,
   AdminMenuItem,
@@ -118,16 +119,20 @@ function formatOrderIdentity(name: string, phone: string | null) {
 }
 
 async function fetchOverviewData() {
-  const response = await fetch('/api/admin/overview', {
-    method: 'GET',
-    cache: 'no-store'
-  }).catch(() => null)
+  const result = await apiFetch<AdminOverviewData>(
+    '/api/admin/overview',
+    {
+      method: 'GET',
+      cache: 'no-store'
+    },
+    'Could not refresh admin overview data.'
+  )
 
-  if (!response?.ok) {
+  if (!result.ok) {
     return null
   }
 
-  return (await response.json()) as AdminOverviewData
+  return result.data
 }
 
 export default function AdminConsole({
@@ -603,56 +608,49 @@ export default function AdminConsole({
     setFlash(null)
     setIsSubmittingOrder(true)
 
-    const response = await fetch('/api/admin/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+    const result = await apiFetch<{ message?: string; receiptUrl?: string }>(
+      '/api/admin/orders',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          orderType,
+          tableId: orderType === 'table' ? selectedTableId : undefined,
+          customerName: orderType === 'out' ? customerName : undefined,
+          customerPhone: orderType === 'out' ? customerPhone : undefined,
+          note,
+          items: selectedItems.map((item) => ({
+            itemId: item.itemId,
+            quantity: item.quantity,
+            portion: item.portion ?? undefined
+          })),
+          customItems: normalizedCustomItems.map((item) => ({
+            name: item.name,
+            unitPriceCents: item.unitPriceCents,
+            quantity: item.quantity
+          }))
+        })
       },
-      body: JSON.stringify({
-        orderType,
-        tableId: orderType === 'table' ? selectedTableId : undefined,
-        customerName: orderType === 'out' ? customerName : undefined,
-        customerPhone: orderType === 'out' ? customerPhone : undefined,
-        note,
-        items: selectedItems.map((item) => ({
-          itemId: item.itemId,
-          quantity: item.quantity,
-          portion: item.portion ?? undefined
-        })),
-        customItems: normalizedCustomItems.map((item) => ({
-          name: item.name,
-          unitPriceCents: item.unitPriceCents,
-          quantity: item.quantity
-        }))
-      })
-    }).catch(() => null)
+      'Could not create the admin order.'
+    )
 
-    if (!response) {
+    if (!result.ok) {
+      if (result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
       setFlash({
         tone: 'error',
-        message: 'Could not create the admin order right now.'
+        message: result.message
       })
       setIsSubmittingOrder(false)
       return
     }
 
-    if (response.status === 401) {
-      router.replace('/admin/login?error=unauthorized')
-      return
-    }
-
-    const payload = (await response.json().catch(() => null)) as
-      | { message?: string; receiptUrl?: string }
-      | null
-
-    if (!response.ok) {
-      setFlash({
-        tone: 'error',
-        message: payload?.message ?? 'Could not create the admin order.'
-      })
-      setIsSubmittingOrder(false)
-      return
-    }
+    const payload = result.data
 
     await refreshAdminOverviewState()
     resetOrderComposer()
@@ -672,69 +670,53 @@ export default function AdminConsole({
   async function handleOpenOutOrderReceipt(orderId: string) {
     setPendingReceiptOrderId(orderId)
 
-    const response = await fetch(`/api/admin/orders/${orderId}/receipt-token`, {
-      method: 'POST'
-    }).catch(() => null)
+    const result = await apiFetch<{ message?: string; receiptUrl?: string }>(
+      `/api/admin/orders/${orderId}/receipt-token`,
+      {
+        method: 'POST'
+      },
+      'Could not open the receipt right now.'
+    )
 
-    if (!response) {
+    if (!result.ok || !result.data?.receiptUrl) {
+      if (!result.ok && result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
       setFlash({
         tone: 'error',
-        message: 'Could not open the receipt right now.'
-      })
-      setPendingReceiptOrderId(null)
-      return
-    }
-
-    if (response.status === 401) {
-      router.replace('/admin/login?error=unauthorized')
-      return
-    }
-
-    const payload = (await response.json().catch(() => null)) as
-      | { message?: string; receiptUrl?: string }
-      | null
-
-    if (!response.ok || !payload?.receiptUrl) {
-      setFlash({
-        tone: 'error',
-        message: payload?.message ?? 'Could not open the receipt right now.'
+        message: result.ok ? 'Could not open the receipt right now.' : result.message
       })
       setPendingReceiptOrderId(null)
       return
     }
 
     setPendingReceiptOrderId(null)
-    router.push(payload.receiptUrl)
+    router.push(result.data.receiptUrl)
   }
 
   async function handleCloseOutOutOrder(orderId: string) {
     setFlash(null)
     setPendingCloseOutOrderId(orderId)
 
-    const response = await fetch(`/api/admin/orders/${orderId}/close-out`, {
-      method: 'POST'
-    }).catch(() => null)
+    const result = await apiFetch<{ message?: string }>(
+      `/api/admin/orders/${orderId}/close-out`,
+      {
+        method: 'POST'
+      },
+      'Could not close out the order.'
+    )
 
-    if (!response) {
+    if (!result.ok) {
+      if (result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
       setFlash({
         tone: 'error',
-        message: 'Could not close out the order right now.'
-      })
-      setPendingCloseOutOrderId(null)
-      return
-    }
-
-    if (response.status === 401) {
-      router.replace('/admin/login?error=unauthorized')
-      return
-    }
-
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null
-
-    if (!response.ok) {
-      setFlash({
-        tone: 'error',
-        message: payload?.message ?? 'Could not close out the order.'
+        message: result.message
       })
       setPendingCloseOutOrderId(null)
       return
@@ -747,7 +729,7 @@ export default function AdminConsole({
 
     setFlash({
       tone: 'success',
-      message: payload?.message ?? 'Order closed out.'
+      message: result.data?.message ?? 'Order closed out.'
     })
     setPendingCloseOutOrderId(null)
   }
@@ -760,38 +742,29 @@ export default function AdminConsole({
     setFlash(null)
     setPendingStatusKey(`${orderId}:${nextStatus}`)
 
-    const response = await fetch(`/api/admin/tables/${tableId}/orders/${orderId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
+    const result = await apiFetch<{ message?: string; status?: OrderStatus }>(
+      `/api/admin/tables/${tableId}/orders/${orderId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: nextStatus
+        })
       },
-      body: JSON.stringify({
-        status: nextStatus
-      })
-    }).catch(() => null)
+      'Could not update the order status.'
+    )
 
-    if (!response) {
+    if (!result.ok) {
+      if (result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
       setFlash({
         tone: 'error',
-        message: 'Could not update the order status.'
-      })
-      setPendingStatusKey(null)
-      return
-    }
-
-    if (response.status === 401) {
-      router.replace('/admin/login?error=unauthorized')
-      return
-    }
-
-    const payload = (await response.json().catch(() => null)) as
-      | { message?: string; status?: OrderStatus }
-      | null
-
-    if (!response.ok) {
-      setFlash({
-        tone: 'error',
-        message: payload?.message ?? 'Could not update the order status.'
+        message: result.message
       })
       setPendingStatusKey(null)
       return
@@ -803,14 +776,14 @@ export default function AdminConsole({
         order.id === orderId
           ? {
             ...order,
-            status: payload?.status ?? nextStatus
+            status: result.data?.status ?? nextStatus
           }
           : order
       )
     }))
     setFlash({
       tone: 'success',
-      message: payload?.message ?? 'Order status updated.'
+      message: result.data?.message ?? 'Order status updated.'
     })
     setPendingStatusKey(null)
   }
@@ -823,42 +796,33 @@ export default function AdminConsole({
     setFlash(null)
     setOrderItemPending(itemId, true)
 
-    const response = await fetch(`/api/admin/orders/${orderId}/items/${itemId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
+    const fallbackMessage =
+      action === 'decrement'
+        ? 'Could not update the order item.'
+        : 'Could not remove the order item.'
+
+    const result = await apiFetch<{ message?: string }>(
+      `/api/admin/orders/${orderId}/items/${itemId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action })
       },
-      body: JSON.stringify({ action })
-    }).catch(() => null)
+      fallbackMessage
+    )
 
-    if (!response) {
+    if (!result.ok) {
+      if (result.status === 401) {
+        setOrderItemPending(itemId, false)
+        router.replace('/admin/login?error=unauthorized')
+        return false
+      }
+
       setFlash({
         tone: 'error',
-        message:
-          action === 'decrement'
-            ? 'Could not update the order item.'
-            : 'Could not remove the order item.'
-      })
-      setOrderItemPending(itemId, false)
-      return false
-    }
-
-    if (response.status === 401) {
-      setOrderItemPending(itemId, false)
-      router.replace('/admin/login?error=unauthorized')
-      return false
-    }
-
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null
-
-    if (!response.ok) {
-      setFlash({
-        tone: 'error',
-        message:
-          payload?.message ??
-          (action === 'decrement'
-            ? 'Could not update the order item.'
-            : 'Could not remove the order item.')
+        message: result.message
       })
       setOrderItemPending(itemId, false)
       return false
@@ -868,7 +832,7 @@ export default function AdminConsole({
     setFlash({
       tone: 'success',
       message:
-        payload?.message ??
+        result.data?.message ??
         (action === 'decrement' ? 'Order item quantity updated.' : 'Order item removed.')
     })
     setOrderItemPending(itemId, false)
@@ -936,36 +900,29 @@ export default function AdminConsole({
     setFlash(null)
     setIsClearingTable(true)
 
-    const response = await fetch(`/api/admin/tables/${clearTargetTableId}/session`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
+    const result = await apiFetch<{ message?: string }>(
+      `/api/admin/tables/${clearTargetTableId}/session`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sessionId: clearTargetSession.id
+        })
       },
-      body: JSON.stringify({
-        sessionId: clearTargetSession.id
-      })
-    }).catch(() => null)
+      'Could not clear the table session.'
+    )
 
-    if (!response) {
+    if (!result.ok) {
+      if (result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
       setFlash({
         tone: 'error',
-        message: 'Could not clear the table session.'
-      })
-      setIsClearingTable(false)
-      return
-    }
-
-    if (response.status === 401) {
-      router.replace('/admin/login?error=unauthorized')
-      return
-    }
-
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null
-
-    if (!response.ok) {
-      setFlash({
-        tone: 'error',
-        message: payload?.message ?? 'Could not clear the table session.'
+        message: result.message
       })
       setIsClearingTable(false)
       return
@@ -994,7 +951,7 @@ export default function AdminConsole({
     setDiscountPercentage('')
     setFlash({
       tone: 'success',
-      message: payload?.message ?? 'Table session cleared.'
+      message: result.data?.message ?? 'Table session cleared.'
     })
     setIsClearingTable(false)
   }
@@ -1014,44 +971,35 @@ export default function AdminConsole({
         discountPercentage.trim() === '' ? null : Number.parseFloat(discountPercentage)
     })
 
-    const response = await fetch('/api/admin/print/receipt-token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+    const result = await apiFetch<{ receiptUrl?: string; message?: string }>(
+      '/api/admin/print/receipt-token',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          payload
+        })
       },
-      body: JSON.stringify({
-        payload
-      })
-    }).catch(() => null)
+      'Could not open the receipt right now.'
+    )
 
-    if (!response) {
+    if (!result.ok || !result.data?.receiptUrl) {
+      if (!result.ok && result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
       setFlash({
         tone: 'error',
-        message: 'Could not open the receipt right now.'
+        message: result.ok ? 'Could not open the receipt right now.' : result.message
       })
       setIsOpeningReceipt(false)
       return
     }
 
-    if (response.status === 401) {
-      router.replace('/admin/login?error=unauthorized')
-      return
-    }
-
-    const result = (await response.json().catch(() => null)) as
-      | { receiptUrl?: string; message?: string }
-      | null
-
-    if (!response.ok || !result?.receiptUrl) {
-      setFlash({
-        tone: 'error',
-        message: result?.message ?? 'Could not open the receipt right now.'
-      })
-      setIsOpeningReceipt(false)
-      return
-    }
-
-    const receiptWindow = window.open(result.receiptUrl, '_blank')
+    const receiptWindow = window.open(result.data.receiptUrl, '_blank')
 
     if (!receiptWindow) {
       setFlash({

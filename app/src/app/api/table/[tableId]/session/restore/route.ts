@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { apiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   getTableOrderIdentityCookieName,
@@ -20,7 +21,7 @@ export async function POST(request: Request, context: RouteContext) {
   const sessionId = body?.sessionId?.trim()
 
   if (!sessionId) {
-    return NextResponse.json({ message: 'Missing session id.' }, { status: 400 })
+    return apiError('Missing session id.', 400, { code: 'session_id_required' })
   }
 
   const supabase = createServerSupabaseClient()
@@ -33,7 +34,11 @@ export async function POST(request: Request, context: RouteContext) {
     .maybeSingle()
 
   if (error || !session) {
-    return NextResponse.json({ message: 'That table session is no longer active.' }, { status: 404 })
+    return apiError('That table session is no longer active.', 404, {
+      code: 'table_session_not_active',
+      context: 'table.session.restore.post.loadSession',
+      cause: error
+    })
   }
 
   const cookieStore = await cookies()

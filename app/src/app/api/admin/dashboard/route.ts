@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getAdminAuthContext } from '@/lib/admin-auth'
 import { getAdminDashboardData } from '@/lib/admin-data'
+import { apiError, unauthorizedApiError } from '@/lib/api-errors'
 
 export async function GET(request: Request) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json(
-      {
-        message: 'Unauthorized.'
-      },
-      { status: 401 }
-    )
+    return unauthorizedApiError()
   }
 
   const { searchParams } = new URL(request.url)
@@ -22,12 +18,11 @@ export async function GET(request: Request) {
   try {
     const data = await getAdminDashboardData({ fromTimestamp, toTimestamp, timezone })
     return NextResponse.json(data)
-  } catch {
-    return NextResponse.json(
-      {
-        message: 'Could not load admin dashboard data.'
-      },
-      { status: 500 }
-    )
+  } catch (error) {
+    return apiError('Could not load admin dashboard data.', 500, {
+      code: 'admin_dashboard_load_failed',
+      context: 'admin.dashboard.get',
+      cause: error
+    })
   }
 }

@@ -16,6 +16,7 @@ import GuestServiceRequestPanel from '@/components/GuestServiceRequestPanel'
 import { Button } from '@/components/ui/button'
 import { SectionCard } from '@/components/ui/section-card'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { logApiError } from '@/lib/api-errors'
 import type { AdminOrder } from '@/lib/admin-data'
 import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -76,6 +77,14 @@ export default async function TablePage({ params, searchParams }: TablePageProps
   ])
 
   const hasError = tableError || activeSessionError || categoriesError || itemsError
+
+  if (hasError) {
+    if (tableError) logApiError('table.page.loadTable', tableError)
+    if (activeSessionError) logApiError('table.page.loadActiveSession', activeSessionError)
+    if (categoriesError) logApiError('table.page.loadCategories', categoriesError)
+    if (itemsError) logApiError('table.page.loadItems', itemsError)
+  }
+
   const isCurrentGuestSession = activeSession?.id === currentSessionId
   const sessionAction = createOrRefreshTableSession.bind(null, tableId)
   const placeOrderAction = placeOrderForTable.bind(null, tableId)
@@ -97,6 +106,10 @@ export default async function TablePage({ params, searchParams }: TablePageProps
       .eq('session_id', accessibleSessionId)
       .order('created_at', { ascending: false })
     : { data: null, error: null }
+
+  if (ordersError) {
+    logApiError('table.page.loadOrders', ordersError)
+  }
 
   const receiptOrders: AdminOrder[] = (orders ?? []).map((order) => ({
     id: order.id,

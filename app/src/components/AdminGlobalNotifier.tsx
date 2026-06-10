@@ -6,6 +6,7 @@ import { ActionGroup } from '@/components/ui/action-group'
 import { Button } from '@/components/ui/button'
 import { SectionCard } from '@/components/ui/section-card'
 import { SummaryRow } from '@/components/ui/summary-row'
+import { apiFetch } from '@/lib/api-client'
 import type { AdminOrder, AdminOverviewData, AdminServiceRequest } from '@/lib/admin-data'
 
 type AdminGlobalNotifierProps = {
@@ -203,25 +204,29 @@ export default function AdminGlobalNotifier({
     }
 
     async function refreshNotifications() {
-      const response = await fetch('/api/admin/overview', {
-        method: 'GET',
-        cache: 'no-store'
-      }).catch(() => null)
+      const result = await apiFetch<AdminOverviewData>(
+        '/api/admin/overview',
+        {
+          method: 'GET',
+          cache: 'no-store'
+        },
+        'Could not load admin overview data.'
+      )
 
-      if (!response || cancelled) {
+      if (cancelled) {
         return
       }
 
-      if (response.status === 401) {
-        router.replace('/admin/login?error=unauthorized')
+      if (!result.ok) {
+        if (result.status === 401) {
+          router.replace('/admin/login?error=unauthorized')
+        }
+
+        setSoundStatusMessage(result.message)
         return
       }
 
-      if (!response.ok) {
-        return
-      }
-
-      const nextData = (await response.json()) as AdminOverviewData
+      const nextData = result.data
 
       if (cancelled) {
         return

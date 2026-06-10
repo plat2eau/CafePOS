@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminAuthContext } from '@/lib/admin-auth'
+import { apiError, logApiError, unauthorizedApiError } from '@/lib/api-errors'
 import { createReceiptToken } from '@/lib/receipt-print-server'
 import { buildReceiptPayloadForOrders } from '@/lib/receipt-print'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   const auth = await getAdminAuthContext()
 
   if (!auth) {
-    return NextResponse.json({ message: 'Unauthorized.' }, { status: 401 })
+    return unauthorizedApiError()
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -73,15 +74,17 @@ export async function POST(request: Request) {
     : []
 
   if (orderType === 'table' && !tableId) {
-    return NextResponse.json({ message: 'Choose a table first.' }, { status: 400 })
+    return apiError('Choose a table first.', 400, { code: 'table_required' })
   }
 
   if (orderType === 'out' && !customerName) {
-    return NextResponse.json({ message: 'Enter a customer name for the out order.' }, { status: 400 })
+    return apiError('Enter a customer name for the out order.', 400, {
+      code: 'customer_name_required'
+    })
   }
 
   if (requestedItems.length === 0 && requestedCustomItems.length === 0) {
-    return NextResponse.json({ message: 'Add at least one item to the order.' }, { status: 400 })
+    return apiError('Add at least one item to the order.', 400, { code: 'order_items_required' })
   }
 
   const supabase = createServerSupabaseClient()
@@ -98,11 +101,15 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (tableError || !table) {
-      return NextResponse.json({ message: 'That table could not be found.' }, { status: 404 })
+      return apiError('That table could not be found.', 404, {
+        code: 'table_not_found',
+        context: 'admin.orders.post.table',
+        cause: tableError
+      })
     }
 
     if (!table.is_active) {
-      return NextResponse.json({ message: 'That table is inactive right now.' }, { status: 400 })
+      return apiError('That table is inactive right now.', 400, { code: 'table_inactive' })
     }
 
     const { data: existingActiveSession, error: sessionError } = await supabase
@@ -113,10 +120,11 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (sessionError) {
-      return NextResponse.json(
-        { message: 'Could not load the current table session.' },
-        { status: 500 }
-      )
+      return apiError('Could not load the current table session.', 500, {
+        code: 'table_session_load_failed',
+        context: 'admin.orders.post.activeSession',
+        cause: sessionError
+      })
     }
 
     activeSessionId = existingActiveSession?.id ?? null
@@ -138,14 +146,18 @@ export async function POST(request: Request) {
         const createSessionErrorMessage = createSessionError?.message?.toLowerCase() ?? ''
 
         if (createSessionErrorMessage.includes('guest_phone')) {
-          return NextResponse.json(
+          return apiError(
+            'The database still requires table_sessions.guest_phone. Apply migration 0006_make_guest_phone_nullable.sql and try again.',
+            500,
             {
-              message:
-                'The database still requires table_sessions.guest_phone. Apply migration 0006_make_guest_phone_nullable.sql and try again.'
-            },
-            { status: 500 }
+              code: 'database_migration_required',
+              context: 'admin.orders.post.createSession',
+              cause: createSessionError
+            }
           )
         }
+
+        logApiError('admin.orders.post.createSession', createSessionError)
 
         const { data: recoveredSession, error: recoverSessionError } = await supabase
           .from('table_sessions')
@@ -155,10 +167,11 @@ export async function POST(request: Request) {
           .maybeSingle()
 
         if (recoverSessionError || !recoveredSession) {
-          return NextResponse.json(
-            { message: 'Could not start a guest session for that table.' },
-            { status: 500 }
-          )
+          return apiError('Could not start a guest session for that table.', 500, {
+            code: 'table_session_create_failed',
+            context: 'admin.orders.post.recoverSession',
+            cause: recoverSessionError
+          })
         }
 
         activeSessionId = recoveredSession.id
@@ -201,10 +214,11 @@ export async function POST(request: Request) {
         .in('id', uniqueItemIds)
 
       if (menuItemsError || !menuItems) {
-        return NextResponse.json(
-          { message: 'Could not validate the selected menu items.' },
-          { status: 500 }
-        )
+        return apiError('Could not validate the selected menu items.', 500, {
+          code: 'menu_item_validation_failed',
+          context: 'admin.orders.post.menuItems',
+          cause: menuItemsError
+        })
       }
 
       for (const item of menuItems) {
@@ -271,6 +285,7 @@ export async function POST(request: Request) {
     const { data: createdOrder, error: orderError } = await supabase
       .from('orders')
       .insert({
+        order_type: orderType,
         session_id: orderType === 'table' ? activeSessionId : null,
         table_id: orderType === 'table' ? tableId : null,
         ordered_by_name: orderType === 'table' ? 'Admin' : customerName,
@@ -290,16 +305,22 @@ export async function POST(request: Request) {
         orderType === 'out' &&
         (orderErrorMessage.includes('table_id') || orderErrorMessage.includes('session_id'))
       ) {
-        return NextResponse.json(
+        return apiError(
+          'The database still requires orders.table_id and orders.session_id. Apply migration 0007_make_orders_table_optional.sql and try again.',
+          500,
           {
-            message:
-              'The database still requires orders.table_id and orders.session_id. Apply migration 0007_make_orders_table_optional.sql and try again.'
-          },
-          { status: 500 }
+            code: 'database_migration_required',
+            context: 'admin.orders.post.createOrder',
+            cause: orderError
+          }
         )
       }
 
-      return NextResponse.json({ message: 'Could not create the order.' }, { status: 500 })
+      return apiError('Could not create the order.', 500, {
+        code: 'order_create_failed',
+        context: 'admin.orders.post.createOrder',
+        cause: orderError
+      })
     }
 
     const { error: orderItemsError } = await supabase.from('order_items').insert(
@@ -310,12 +331,16 @@ export async function POST(request: Request) {
     )
 
     if (orderItemsError) {
-      await supabase.from('orders').delete().eq('id', createdOrder.id)
+      const { error: cleanupError } = await supabase.from('orders').delete().eq('id', createdOrder.id)
+      if (cleanupError) {
+        logApiError('admin.orders.post.cleanupOrderAfterItemsFailure', cleanupError)
+      }
 
-      return NextResponse.json(
-        { message: 'Could not save the order items.' },
-        { status: 500 }
-      )
+      return apiError('Could not save the order items.', 500, {
+        code: 'order_items_create_failed',
+        context: 'admin.orders.post.createOrderItems',
+        cause: orderItemsError
+      })
     }
 
     if (orderType === 'out') {
@@ -351,20 +376,25 @@ export async function POST(request: Request) {
         receiptUrl: receiptUrl.toString()
       })
     }
-  } catch {
-    return NextResponse.json(
-      { message: 'One or more selected items are unavailable.' },
-      { status: 400 }
-    )
+  } catch (error) {
+    return apiError('One or more selected items are unavailable.', 400, {
+      code: 'order_item_unavailable',
+      context: 'admin.orders.post.normalizeItems',
+      cause: error
+    })
   }
 
   if (orderType === 'table' && activeSessionId && tableId) {
-    await supabase
+    const { error: touchSessionError } = await supabase
       .from('table_sessions')
       .update({
         last_active_at: new Date().toISOString()
       })
       .eq('id', activeSessionId)
+
+    if (touchSessionError) {
+      logApiError('admin.orders.post.touchSession', touchSessionError)
+    }
 
     revalidatePath(`/table/${tableId}`)
     revalidatePath(`/table/${tableId}/orders`)
