@@ -1,0 +1,65 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "1. Start Next debug server (:3001)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/app",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "../node_modules/next/dist/bin/next",
+        "dev",
+        "-p",
+        "3001"
+      ],
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/app/.next/**/*.js"
+      ],
+      "sourceMapPathOverrides": {
+        "turbopack://[project]/*": "${workspaceFolder}/app/*",
+        "webpack://_N_E/./*": "${workspaceFolder}/app/*",
+        "webpack://_N_E/*": "${workspaceFolder}/app/*",
+        "webpack-internal:///(rsc)/./src/*": "${workspaceFolder}/app/src/*",
+        "webpack-internal:///(rsc)/./*": "${workspaceFolder}/app/*",
+        "webpack-internal:///(ssr)/./src/*": "${workspaceFolder}/app/src/*",
+        "webpack-internal:///(ssr)/./*": "${workspaceFolder}/app/*"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "- Local:.+(https?://.+)",
+        "uriFormat": "%s"
+      }
+    },
+    {
+      "name": "2. Attach to Next worker process",
+      "type": "node",
+      "request": "attach",
+      "processId": "${command:PickProcess}",
+      "continueOnAttach": true,
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/app/.next/**/*.js"
+      ],
+      "sourceMapPathOverrides": {
+        "turbopack://[project]/*": "${workspaceFolder}/app/*",
+        "webpack://_N_E/./*": "${workspaceFolder}/app/*",
+        "webpack://_N_E/*": "${workspaceFolder}/app/*",
+        "webpack-internal:///(rsc)/./src/*": "${workspaceFolder}/app/src/*",
+        "webpack-internal:///(rsc)/./*": "${workspaceFolder}/app/*",
+        "webpack-internal:///(ssr)/./src/*": "${workspaceFolder}/app/src/*",
+        "webpack-internal:///(ssr)/./*": "${workspaceFolder}/app/*"
+      }
+    }
+  ]
+}

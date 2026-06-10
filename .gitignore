@@ -18,6 +18,8 @@ coverage
 # editor
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 .idea
 
 # supabase local state

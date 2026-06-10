@@ -31,14 +31,14 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as
     | {
-        orderType?: 'table' | 'out'
-        tableId?: string
-        customerName?: string
-        customerPhone?: string
-        items?: RequestedOrderItem[]
-        customItems?: RequestedCustomItem[]
-        note?: string
-      }
+      orderType?: 'table' | 'out'
+      tableId?: string
+      customerName?: string
+      customerPhone?: string
+      items?: RequestedOrderItem[]
+      customItems?: RequestedCustomItem[]
+      note?: string
+    }
     | null
 
   const orderType = body?.orderType === 'out' ? 'out' : 'table'
@@ -48,28 +48,28 @@ export async function POST(request: Request) {
   const note = body?.note?.trim() || null
   const requestedItems = Array.isArray(body?.items)
     ? body.items
-        .map((item) => ({
-          itemId: String(item?.itemId ?? '').trim(),
-          quantity: Number(item?.quantity ?? 0),
-          portion: item?.portion === 'half' || item?.portion === 'full' ? item.portion : null
-        }))
-        .filter((item) => item.itemId && Number.isInteger(item.quantity) && item.quantity > 0)
+      .map((item) => ({
+        itemId: String(item?.itemId ?? '').trim(),
+        quantity: Number(item?.quantity ?? 0),
+        portion: item?.portion === 'half' || item?.portion === 'full' ? item.portion : null
+      }))
+      .filter((item) => item.itemId && Number.isInteger(item.quantity) && item.quantity > 0)
     : []
   const requestedCustomItems = Array.isArray(body?.customItems)
     ? body.customItems
-        .map((item) => ({
-          name: String(item?.name ?? '').trim(),
-          unitPriceCents: Number(item?.unitPriceCents ?? 0),
-          quantity: Number(item?.quantity ?? 0)
-        }))
-        .filter(
-          (item) =>
-            item.name &&
-            Number.isInteger(item.unitPriceCents) &&
-            item.unitPriceCents > 0 &&
-            Number.isInteger(item.quantity) &&
-            item.quantity > 0
-        )
+      .map((item) => ({
+        name: String(item?.name ?? '').trim(),
+        unitPriceCents: Number(item?.unitPriceCents ?? 0),
+        quantity: Number(item?.quantity ?? 0)
+      }))
+      .filter(
+        (item) =>
+          item.name &&
+          Number.isInteger(item.unitPriceCents) &&
+          item.unitPriceCents > 0 &&
+          Number.isInteger(item.quantity) &&
+          item.quantity > 0
+      )
     : []
 
   if (orderType === 'table' && !tableId) {
@@ -378,7 +378,7 @@ export async function POST(request: Request) {
     ok: true,
     message:
       createdSession
-          ? 'Admin order created and guest session started.'
-          : 'Admin order created.'
+        ? 'Admin order created and guest session started.'
+        : 'Admin order created.'
   })
 }
