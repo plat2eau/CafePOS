@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type {
   AdminPurchase,
@@ -17,6 +17,13 @@ import {
   type PurchaseUnit
 } from '@/lib/purchase-options'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { FlashMessage } from '@/components/ui/flash-message'
 import { Input } from '@/components/ui/input'
 import { LoadingButton } from '@/components/ui/loading-button'
@@ -36,6 +43,7 @@ type PurchaseLineDraft = {
   quantity: string
   unit: PurchaseUnit
   unitPrice: string
+  totalPrice: string
 }
 
 type PurchaseDraft = {
@@ -49,6 +57,14 @@ type PurchaseDraft = {
   tax: string
   discount: string
   lines: PurchaseLineDraft[]
+}
+
+type ActiveCreatePanel = 'purchase' | 'vendor' | 'item' | null
+
+type RemovePurchaseTarget = {
+  id: string
+  vendorName: string
+  totalCents: number
 }
 
 type AdminPurchasesClientProps = {
@@ -123,8 +139,36 @@ function createBlankLine(defaultUnit: PurchaseUnit = 'pcs'): PurchaseLineDraft {
     purchaseItemId: '',
     quantity: '1',
     unit: defaultUnit,
-    unitPrice: ''
+    unitPrice: '',
+    totalPrice: ''
   }
+}
+
+function getLineQuantity(value: string) {
+  const quantity = Number(value)
+
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : null
+}
+
+function getLineTotalCents(line: PurchaseLineDraft) {
+  return parsePriceToCents(line.totalPrice)
+}
+
+function getLineUnitPriceCents(line: PurchaseLineDraft) {
+  const quantity = getLineQuantity(line.quantity)
+  const totalCents = getLineTotalCents(line)
+
+  if (!quantity || totalCents === null) {
+    return null
+  }
+
+  return Math.round(totalCents / quantity)
+}
+
+function getLineUnitPriceLabel(line: PurchaseLineDraft) {
+  const unitPriceCents = getLineUnitPriceCents(line)
+
+  return unitPriceCents === null ? 'Set quantity and total' : toPrice(unitPriceCents)
 }
 
 function createDraft(vendors: AdminVendor[]): PurchaseDraft {
@@ -146,14 +190,20 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
   const [data, setData] = useState(initialData)
   const [draft, setDraft] = useState(() => createDraft(initialData.vendors))
   const [flash, setFlash] = useState<FlashState | null>(null)
+  const [activeCreatePanel, setActiveCreatePanel] = useState<ActiveCreatePanel>(null)
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
   const [isSavingPurchase, setIsSavingPurchase] = useState(false)
   const [isAddingVendor, setIsAddingVendor] = useState(false)
   const [isAddingItem, setIsAddingItem] = useState(false)
+  const [isRemovingPurchase, setIsRemovingPurchase] = useState(false)
   const [pendingToggleKey, setPendingToggleKey] = useState<string | null>(null)
+  const [removePurchaseTarget, setRemovePurchaseTarget] = useState<RemovePurchaseTarget | null>(null)
   const [vendorName, setVendorName] = useState('')
   const [vendorPhone, setVendorPhone] = useState('')
   const [vendorAddress, setVendorAddress] = useState('')
   const [itemName, setItemName] = useState('')
+  const createMenuRef = useRef<HTMLDivElement | null>(null)
+  const createMenuId = useId()
 
   const activeVendors = useMemo(
     () => data.vendors.filter((vendor) => vendor.is_active),
@@ -165,14 +215,13 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
   )
   const draftTotals = useMemo(() => {
     const subtotalCents = draft.lines.reduce((sum, line) => {
-      const quantity = Number(line.quantity)
-      const unitPriceCents = parsePriceToCents(line.unitPrice)
+      const lineTotalCents = getLineTotalCents(line)
 
-      if (!Number.isFinite(quantity) || quantity <= 0 || unitPriceCents === null) {
+      if (lineTotalCents === null) {
         return sum
       }
 
-      return sum + Math.round(unitPriceCents * quantity)
+      return sum + lineTotalCents
     }, 0)
     const taxCents = parsePriceToCents(draft.tax)
     const discountCents = parsePriceToCents(draft.discount)
@@ -184,9 +233,66 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
       totalCents: Math.max(0, subtotalCents + (taxCents ?? 0) - (discountCents ?? 0))
     }
   }, [draft.discount, draft.lines, draft.tax])
+  const showPurchaseForm = activeCreatePanel === 'purchase' || Boolean(draft.editingPurchaseId)
+  const showInlineCreateForms = false
+
+  useEffect(() => {
+    if (!isCreateMenuOpen) {
+      return
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!createMenuRef.current?.contains(event.target as Node)) {
+        setIsCreateMenuOpen(false)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsCreateMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isCreateMenuOpen])
 
   function resetDraft(nextData = data) {
     setDraft(createDraft(nextData.vendors))
+  }
+
+  function openCreatePanel(panel: Exclude<ActiveCreatePanel, null>) {
+    setFlash(null)
+    setIsCreateMenuOpen(false)
+    setActiveCreatePanel(panel)
+
+    if (panel === 'purchase') {
+      resetDraft()
+    }
+
+    if (panel === 'vendor') {
+      setVendorName('')
+      setVendorPhone('')
+      setVendorAddress('')
+    }
+
+    if (panel === 'item') {
+      setItemName('')
+    }
+  }
+
+  function closePurchaseForm() {
+    resetDraft()
+    setActiveCreatePanel(null)
+  }
+
+  function closeCreatePanel() {
+    setActiveCreatePanel(null)
   }
 
   async function refreshPurchasesData() {
@@ -247,6 +353,7 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
 
   function editPurchase(purchase: AdminPurchase) {
     setFlash(null)
+    setActiveCreatePanel('purchase')
     setDraft({
       editingPurchaseId: purchase.id,
       vendorId: purchase.vendor_id,
@@ -264,7 +371,8 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
             purchaseItemId: line.purchase_item_id,
             quantity: String(line.quantity),
             unit: line.unit,
-            unitPrice: centsToInput(line.unit_price_cents)
+            unitPrice: centsToInput(line.unit_price_cents),
+            totalPrice: centsToInput(line.line_total_cents)
           }))
           : [createBlankLine()]
     })
@@ -313,6 +421,7 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
     setVendorName('')
     setVendorPhone('')
     setVendorAddress('')
+    setActiveCreatePanel(null)
     setFlash({ tone: 'success', message: result.data.message ?? 'Vendor added.' })
   }
 
@@ -363,6 +472,7 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
       )
     }))
     setItemName('')
+    setActiveCreatePanel(null)
     setFlash({ tone: 'success', message: result.data.message ?? 'Purchase item added.' })
   }
 
@@ -428,6 +538,37 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
     setFlash({ tone: 'success', message: result.data.message ?? 'Purchase item updated.' })
   }
 
+  async function handleRemovePurchase() {
+    if (!removePurchaseTarget) {
+      return
+    }
+
+    setIsRemovingPurchase(true)
+    setFlash(null)
+
+    const result = await apiFetch<{ purchaseId: string; message?: string }>(
+      `/api/admin/purchases/${removePurchaseTarget.id}`,
+      {
+        method: 'DELETE'
+      },
+      'Could not remove purchase.'
+    )
+
+    setIsRemovingPurchase(false)
+
+    if (!result.ok) {
+      setFlash({ tone: 'error', message: result.message })
+      return
+    }
+
+    setData((current) => ({
+      ...current,
+      purchases: current.purchases.filter((purchase) => purchase.id !== removePurchaseTarget.id)
+    }))
+    setRemovePurchaseTarget(null)
+    setFlash({ tone: 'success', message: result.data.message ?? 'Purchase removed.' })
+  }
+
   async function handleSavePurchase() {
     setIsSavingPurchase(true)
     setFlash(null)
@@ -445,7 +586,7 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
         purchaseItemId: line.purchaseItemId,
         quantity: line.quantity,
         unit: line.unit,
-        unitPriceCents: parsePriceToCents(line.unitPrice)
+        unitPriceCents: getLineUnitPriceCents(line)
       }))
     }
     const isEditing = Boolean(draft.editingPurchaseId)
@@ -468,30 +609,464 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
 
     const refreshedData = await refreshPurchasesData()
     resetDraft(refreshedData ?? data)
+    setActiveCreatePanel(null)
     setFlash({ tone: 'success', message: result.data.message ?? 'Purchase saved.' })
   }
 
   return (
     <div className="stack">
+      <div className="adminConsoleHeader">
+        <div className="heroHeader compact">
+          <h1>Purchases</h1>
+          <p className="lead">Record vendor bills, reusable purchase items, and expense history.</p>
+        </div>
+        <div className="adminCreateMenu" ref={createMenuRef}>
+          <Button
+            size="icon"
+            type="button"
+            aria-label="Open create menu"
+            aria-haspopup="menu"
+            aria-expanded={isCreateMenuOpen}
+            aria-controls={createMenuId}
+            onClick={() => setIsCreateMenuOpen((current) => !current)}
+          >
+            +
+          </Button>
+          {isCreateMenuOpen ? (
+            <div className="adminCreateMenuPanel" id={createMenuId} role="menu" aria-label="Create actions">
+              <button
+                className="adminCreateMenuItem"
+                type="button"
+                role="menuitem"
+                onClick={() => openCreatePanel('purchase')}
+              >
+                Add purchase
+              </button>
+              <button
+                className="adminCreateMenuItem"
+                type="button"
+                role="menuitem"
+                onClick={() => openCreatePanel('vendor')}
+              >
+                Add vendor
+              </button>
+              <button
+                className="adminCreateMenuItem"
+                type="button"
+                role="menuitem"
+                onClick={() => openCreatePanel('item')}
+              >
+                Add item
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
       {flash ? (
         <FlashMessage tone={flash.tone}>
           {flash.message}
         </FlashMessage>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+      <Dialog
+        open={showPurchaseForm}
+        onOpenChange={(open) => {
+          if (!open) {
+            closePurchaseForm()
+          }
+        }}
+      >
+        <DialogContent className="w-[min(980px,calc(100vw-24px))]">
+          <DialogHeader>
+            <DialogTitle>{draft.editingPurchaseId ? 'Edit purchase' : 'Add purchase'}</DialogTitle>
+            <DialogDescription>
+              Record vendor bill details, line items, and payment status.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="formField">
+                <label htmlFor="purchase-vendor">Vendor</label>
+                <select
+                  id="purchase-vendor"
+                  value={draft.vendorId}
+                  onChange={(event) => setDraft((current) => ({ ...current, vendorId: event.target.value }))}
+                >
+                  <option value="">Choose vendor</option>
+                  {activeVendors.map((vendor) => (
+                    <option key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="formField">
+                <label htmlFor="purchase-date">Date</label>
+                <Input
+                  id="purchase-date"
+                  type="date"
+                  value={draft.purchaseDate}
+                  onChange={(event) => setDraft((current) => ({ ...current, purchaseDate: event.target.value }))}
+                />
+              </div>
+              <div className="formField">
+                <label htmlFor="purchase-invoice">Invoice</label>
+                <Input
+                  id="purchase-invoice"
+                  type="text"
+                  placeholder="Optional"
+                  value={draft.invoiceNumber}
+                  onChange={(event) => setDraft((current) => ({ ...current, invoiceNumber: event.target.value }))}
+                />
+              </div>
+              <div className="formField">
+                <label htmlFor="purchase-status">Payment status</label>
+                <select
+                  id="purchase-status"
+                  value={draft.paymentStatus}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      paymentStatus: event.target.value as PurchasePaymentStatus
+                    }))
+                  }
+                >
+                  {purchasePaymentStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {formatStatus(status)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="formField">
+                <label htmlFor="purchase-method">Payment method</label>
+                <select
+                  id="purchase-method"
+                  value={draft.paymentMethod}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      paymentMethod: event.target.value as PurchasePaymentMethod | ''
+                    }))
+                  }
+                >
+                  <option value="">Not set</option>
+                  {purchasePaymentMethods.map((method) => (
+                    <option key={method} value={method}>
+                      {formatStatus(method)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {draft.lines.map((line, index) => (
+                <div
+                  key={line.localId}
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--panel-strong)] p-3"
+                >
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1.4fr)_0.75fr_0.8fr_0.9fr_0.9fr_auto] sm:items-end">
+                    <div className="formField">
+                      <label htmlFor={`purchase-line-item-${line.localId}`}>Item</label>
+                      <select
+                        id={`purchase-line-item-${line.localId}`}
+                        value={line.purchaseItemId}
+                        onChange={(event) => selectLineItem(line.localId, event.target.value)}
+                      >
+                        <option value="">Choose item</option>
+                        {activePurchaseItems.map((purchaseItem) => (
+                          <option key={purchaseItem.id} value={purchaseItem.id}>
+                            {purchaseItem.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="formField">
+                      <label htmlFor={`purchase-line-quantity-${line.localId}`}>Bought qty</label>
+                      <Input
+                        id={`purchase-line-quantity-${line.localId}`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.001"
+                        value={line.quantity}
+                        onChange={(event) => updateLine(line.localId, { quantity: event.target.value })}
+                      />
+                    </div>
+                    <div className="formField">
+                      <label htmlFor={`purchase-line-unit-${line.localId}`}>Unit</label>
+                      <select
+                        id={`purchase-line-unit-${line.localId}`}
+                        value={line.unit}
+                        onChange={(event) => updateLine(line.localId, { unit: event.target.value as PurchaseUnit })}
+                      >
+                        {purchaseUnits.map((unit) => (
+                          <option key={unit} value={unit}>
+                            {unit}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="formField">
+                      <label htmlFor={`purchase-line-total-${line.localId}`}>Total price</label>
+                      <Input
+                        id={`purchase-line-total-${line.localId}`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={line.totalPrice}
+                        onChange={(event) =>
+                          updateLine(line.localId, {
+                            totalPrice: event.target.value,
+                            unitPrice: centsToInput(getLineUnitPriceCents({
+                              ...line,
+                              totalPrice: event.target.value
+                            }) ?? 0)
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="formField">
+                      <label>Unit price</label>
+                      <p className="metaPill">{getLineUnitPriceLabel(line)}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={draft.lines.length === 1}
+                      onClick={() => removeLine(line.localId)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                  <p className="finePrint mt-2">
+                    Line {index + 1}: {toPrice(getLineTotalCents(line) ?? 0)}
+                  </p>
+                </div>
+              ))}
+              <Button type="button" variant="secondary" onClick={() => addLine()}>
+                Add line
+              </Button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="formField">
+                <label htmlFor="purchase-tax">Tax</label>
+                <Input
+                  id="purchase-tax"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={draft.tax}
+                  onChange={(event) => setDraft((current) => ({ ...current, tax: event.target.value }))}
+                />
+              </div>
+              <div className="formField">
+                <label htmlFor="purchase-discount">Discount</label>
+                <Input
+                  id="purchase-discount"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={draft.discount}
+                  onChange={(event) => setDraft((current) => ({ ...current, discount: event.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="formField">
+              <label htmlFor="purchase-notes">Notes</label>
+              <Textarea
+                id="purchase-notes"
+                rows={3}
+                value={draft.notes}
+                onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
+              />
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] p-4">
+              <SummaryRow>
+                <span>Subtotal</span>
+                <strong>{toPrice(draftTotals.subtotalCents)}</strong>
+              </SummaryRow>
+              <SummaryRow>
+                <span>Tax</span>
+                <span>{toPrice(draftTotals.taxCents)}</span>
+              </SummaryRow>
+              <SummaryRow>
+                <span>Discount</span>
+                <span>{toPrice(draftTotals.discountCents)}</span>
+              </SummaryRow>
+              <SummaryRow variant="total">
+                <span>Total</span>
+                <strong>{toPrice(draftTotals.totalCents)}</strong>
+              </SummaryRow>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="secondary" size="form" onClick={closePurchaseForm}>
+                {draft.editingPurchaseId ? 'Cancel edit' : 'Cancel'}
+              </Button>
+              <LoadingButton
+                type="button"
+                size="form"
+                loading={isSavingPurchase}
+                loadingLabel="Saving purchase..."
+                onClick={() => void handleSavePurchase()}
+              >
+                {draft.editingPurchaseId ? 'Update purchase' : 'Save purchase'}
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={activeCreatePanel === 'vendor'}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCreatePanel()
+          }
+        }}
+      >
+        <DialogContent className="w-[min(560px,calc(100vw-24px))]">
+          <DialogHeader>
+            <DialogTitle>Add vendor</DialogTitle>
+            <DialogDescription>Add a vendor to the purchase ledger.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <Input
+              type="text"
+              placeholder="Vendor name"
+              value={vendorName}
+              onChange={(event) => setVendorName(event.target.value)}
+            />
+            <Input
+              type="tel"
+              placeholder="Phone"
+              value={vendorPhone}
+              onChange={(event) => setVendorPhone(event.target.value)}
+            />
+            <Input
+              type="text"
+              placeholder="Address"
+              value={vendorAddress}
+              onChange={(event) => setVendorAddress(event.target.value)}
+            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="secondary" size="form" onClick={closeCreatePanel}>
+                Cancel
+              </Button>
+              <LoadingButton
+                type="button"
+                size="form"
+                loading={isAddingVendor}
+                loadingLabel="Adding vendor..."
+                onClick={() => void handleAddVendor()}
+              >
+                Add vendor
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={activeCreatePanel === 'item'}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCreatePanel()
+          }
+        }}
+      >
+        <DialogContent className="w-[min(480px,calc(100vw-24px))]">
+          <DialogHeader>
+            <DialogTitle>Add item</DialogTitle>
+            <DialogDescription>Add an item to the purchase catalog.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <Input
+              type="text"
+              placeholder="Item name"
+              value={itemName}
+              onChange={(event) => setItemName(event.target.value)}
+            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="secondary" size="form" onClick={closeCreatePanel}>
+                Cancel
+              </Button>
+              <LoadingButton
+                type="button"
+                size="form"
+                loading={isAddingItem}
+                loadingLabel="Adding item..."
+                onClick={() => void handleAddPurchaseItem()}
+              >
+                Add item
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(removePurchaseTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isRemovingPurchase) {
+            setRemovePurchaseTarget(null)
+          }
+        }}
+      >
+        <DialogContent className="w-[min(460px,calc(100vw-24px))]">
+          <DialogHeader>
+            <DialogTitle>Remove purchase?</DialogTitle>
+            <DialogDescription>
+              This will remove {removePurchaseTarget?.vendorName ?? 'this purchase'} for{' '}
+              {toPrice(removePurchaseTarget?.totalCents ?? 0)}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="secondary"
+              size="form"
+              disabled={isRemovingPurchase}
+              onClick={() => setRemovePurchaseTarget(null)}
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="button"
+              size="form"
+              loading={isRemovingPurchase}
+              loadingLabel="Removing..."
+              onClick={() => void handleRemovePurchase()}
+            >
+              Remove
+            </LoadingButton>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="grid gap-4">
         <SectionCard>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="eyebrow">Purchase Ledger</p>
               <h2>Recent purchases</h2>
             </div>
-            <Button variant="secondary" type="button" onClick={() => resetDraft()}>
-              New purchase
-            </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="purchaseLedgerGrid">
             {data.purchases.length === 0 ? (
               <p className="finePrint">No purchases recorded yet.</p>
             ) : (
@@ -515,8 +1090,33 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
                     </div>
                     <div className="flex flex-wrap items-center gap-2 md:justify-end">
                       <strong>{toPrice(purchase.total_cents)}</strong>
-                      <Button size="sm" variant="secondary" type="button" onClick={() => editPurchase(purchase)}>
-                        Edit
+                      <Button
+                        className="purchaseIconButton"
+                        size="icon"
+                        variant="secondary"
+                        type="button"
+                        aria-label={`Edit purchase from ${purchase.vendor_name}`}
+                        title="Edit purchase"
+                        onClick={() => editPurchase(purchase)}
+                      >
+                        ✎
+                      </Button>
+                      <Button
+                        className="purchaseIconButton"
+                        size="icon"
+                        variant="secondary"
+                        type="button"
+                        aria-label={`Remove purchase from ${purchase.vendor_name}`}
+                        title="Remove purchase"
+                        onClick={() =>
+                          setRemovePurchaseTarget({
+                            id: purchase.id,
+                            vendorName: purchase.vendor_name,
+                            totalCents: purchase.total_cents
+                          })
+                        }
+                      >
+                        ×
                       </Button>
                     </div>
                   </div>
@@ -525,7 +1125,7 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
                     {purchase.lines.map((line) => (
                       <SummaryRow className="text-sm" key={line.id}>
                         <span>
-                          {line.item_name} · {line.quantity} {line.unit}
+                          {line.item_name} - {line.quantity} {line.unit} - {toPrice(line.unit_price_cents)}/{line.unit}
                         </span>
                         <span>{toPrice(line.line_total_cents)}</span>
                       </SummaryRow>
@@ -541,6 +1141,7 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
           </div>
         </SectionCard>
 
+        {showInlineCreateForms && showPurchaseForm ? (
         <SectionCard>
           <div className="mb-4">
             <p className="eyebrow">Bill Entry</p>
@@ -762,8 +1363,13 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
 
             <div className="flex flex-col gap-2 sm:flex-row">
               {draft.editingPurchaseId ? (
-                <Button type="button" variant="secondary" size="form" onClick={() => resetDraft()}>
+                <Button type="button" variant="secondary" size="form" onClick={closePurchaseForm}>
                   Cancel edit
+                </Button>
+              ) : null}
+              {!draft.editingPurchaseId ? (
+                <Button type="button" variant="secondary" size="form" onClick={closePurchaseForm}>
+                  Cancel
                 </Button>
               ) : null}
               <LoadingButton
@@ -778,6 +1384,7 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
             </div>
           </div>
         </SectionCard>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -787,7 +1394,8 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
             <h2>Vendor management</h2>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_0.75fr]">
+          {showInlineCreateForms && activeCreatePanel === 'vendor' ? (
+          <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_0.75fr]">
             <Input
               type="text"
               placeholder="Vendor name"
@@ -818,23 +1426,28 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
               Add vendor
             </LoadingButton>
           </div>
+          ) : null}
 
-          <div className="mt-4 space-y-2">
+          <div className="space-y-2">
             {data.vendors.map((vendor) => (
               <SummaryRow key={vendor.id}>
                 <span>
                   {vendor.name}
                   {vendor.phone ? ` · ${vendor.phone}` : ''}
                 </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={pendingToggleKey === `vendor-${vendor.id}`}
-                  onClick={() => void toggleVendor(vendor)}
-                >
-                  {vendor.is_active ? 'Deactivate' : 'Reactivate'}
-                </Button>
+                <label className="adminSwitch">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={vendor.is_active}
+                    disabled={pendingToggleKey === `vendor-${vendor.id}`}
+                    aria-label={`${vendor.is_active ? 'Deactivate' : 'Reactivate'} ${vendor.name}`}
+                    onChange={() => void toggleVendor(vendor)}
+                  />
+                  <span className="adminSwitchTrack" aria-hidden="true">
+                    <span className="adminSwitchThumb" />
+                  </span>
+                </label>
               </SummaryRow>
             ))}
           </div>
@@ -846,7 +1459,8 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
             <h2>Purchase item catalog</h2>
           </div>
 
-          <div className="grid gap-3">
+          {showInlineCreateForms && activeCreatePanel === 'item' ? (
+          <div className="mb-4 grid gap-3">
             <Input
               type="text"
               placeholder="Item name"
@@ -863,20 +1477,25 @@ export default function AdminPurchasesClient({ initialData }: AdminPurchasesClie
               Add purchase item
             </LoadingButton>
           </div>
+          ) : null}
 
-          <div className="mt-4 space-y-2">
+          <div className="space-y-2">
             {data.purchaseItems.map((purchaseItem) => (
               <SummaryRow key={purchaseItem.id}>
                 <span>{purchaseItem.name}</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={pendingToggleKey === `item-${purchaseItem.id}`}
-                  onClick={() => void togglePurchaseItem(purchaseItem)}
-                >
-                  {purchaseItem.is_active ? 'Deactivate' : 'Reactivate'}
-                </Button>
+                <label className="adminSwitch">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={purchaseItem.is_active}
+                    disabled={pendingToggleKey === `item-${purchaseItem.id}`}
+                    aria-label={`${purchaseItem.is_active ? 'Deactivate' : 'Reactivate'} ${purchaseItem.name}`}
+                    onChange={() => void togglePurchaseItem(purchaseItem)}
+                  />
+                  <span className="adminSwitchTrack" aria-hidden="true">
+                    <span className="adminSwitchThumb" />
+                  </span>
+                </label>
               </SummaryRow>
             ))}
           </div>

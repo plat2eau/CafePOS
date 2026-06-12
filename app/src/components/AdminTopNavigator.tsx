@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import AdminLogoutButton from '@/components/AdminLogoutButton'
+import AdminProfileMenu, { type AdminProfileMenuAuth } from '@/components/AdminProfileMenu'
 
 const adminTabs = [
   {
@@ -25,7 +25,11 @@ function isActiveTab(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export default function AdminTopNavigator() {
+type AdminTopNavigatorProps = {
+  auth: AdminProfileMenuAuth | null
+}
+
+export default function AdminTopNavigator({ auth }: AdminTopNavigatorProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -62,7 +66,7 @@ export default function AdminTopNavigator() {
             />
           </span>
         </Link>
-        <AdminLogoutButton />
+        <AdminProfileMenu auth={auth} />
       </div>
 
       <nav className="adminTopNavigatorTabs" aria-label="Admin sections">

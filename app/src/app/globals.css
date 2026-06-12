@@ -253,6 +253,120 @@ html[data-color-scheme='dark'] .adminTopNavigatorLogoAssetDark {
   box-shadow: 0 -8px 18px rgb(var(--shadow-rgb) / 0.04);
 }
 
+.adminProfileMenu {
+  position: relative;
+  z-index: 40;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.adminProfileMenuTrigger {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  box-shadow: 0 10px 24px rgb(var(--shadow-rgb) / 0.1);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.adminProfileMenuTrigger:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--accent-rgb) / 0.45);
+  box-shadow: 0 14px 28px rgb(var(--shadow-rgb) / 0.14);
+}
+
+.adminProfileMenuTrigger:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.adminProfileMenuAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.adminProfileMenuPanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  width: min(260px, calc(100vw - 24px));
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-strong);
+  padding: 12px;
+  box-shadow: 0 18px 44px rgb(var(--shadow-rgb) / 0.18);
+}
+
+.adminProfileMenuPanel::before {
+  position: absolute;
+  top: -6px;
+  right: 17px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  background: var(--panel-strong);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.adminProfileMenuGreeting {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 6px 4px 2px;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.adminProfileMenuSignOut {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  min-height: 42px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.adminProfileMenuSignOut:hover {
+  border-color: rgb(var(--accent-rgb) / 0.45);
+  background: var(--accent-soft);
+}
+
+.adminProfileMenuSignOut:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.adminProfileMenuSignOut:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .heroHeader {
   display: flex;
   flex-direction: column;
@@ -373,6 +487,75 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   gap: 10px;
 }
 
+.adminConsoleHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.adminConsoleHeader .heroHeader {
+  min-width: 0;
+}
+
+.adminCreateMenu {
+  position: relative;
+  z-index: 30;
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.adminCreateMenu > button {
+  border-radius: 999px;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.adminCreateMenuPanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  width: min(200px, calc(100vw - 24px));
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  padding: 8px;
+  box-shadow: 0 18px 44px rgb(var(--shadow-rgb) / 0.18);
+}
+
+.adminCreateMenuItem {
+  display: flex;
+  min-height: 40px;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 8px 10px;
+  text-align: left;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.adminCreateMenuItem:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.adminCreateMenuItem:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .responsiveSplit {
   display: flex;
   flex-direction: column-reverse;
@@ -382,16 +565,16 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
 .activeOrdersHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
 .activeOrdersNav {
   display: none;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
 }
 
 .activeOrdersNav button {
@@ -426,6 +609,78 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
 
 .activeOrdersCarouselItem > * {
   height: 100%;
+}
+
+.purchaseLedgerGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.purchaseIconButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.adminSwitch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  cursor: pointer;
+}
+
+.adminSwitch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.adminSwitchTrack {
+  display: inline-flex;
+  width: 46px;
+  height: 26px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card-bg);
+  padding: 2px;
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.adminSwitchThumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow: 0 2px 6px rgb(var(--shadow-rgb) / 0.18);
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.adminSwitch input:checked + .adminSwitchTrack {
+  border-color: rgb(var(--accent-rgb) / 0.5);
+  background: var(--accent-soft);
+}
+
+.adminSwitch input:checked + .adminSwitchTrack .adminSwitchThumb {
+  background: var(--accent);
+  transform: translateX(20px);
+}
+
+.adminSwitch input:focus-visible + .adminSwitchTrack {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.adminSwitch input:disabled + .adminSwitchTrack {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .serviceCardGrid {
@@ -1985,6 +2240,10 @@ html[data-color-scheme='dark'] .menuFloatingNavigatorPill.isActive {
 @media (min-width: 900px) {
   .activeOrdersNav {
     display: flex;
+  }
+
+  .purchaseLedgerGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .serviceCardGrid {

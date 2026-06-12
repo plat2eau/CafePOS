@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Default admin profile photo">
+  <defs>
+    <linearGradient id="avatar-bg" x1="16" x2="80" y1="12" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff7ed"/>
+      <stop offset="1" stop-color="#d9b48d"/>
+    </linearGradient>
+    <linearGradient id="avatar-shirt" x1="24" x2="72" y1="56" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7b4b25"/>
+      <stop offset="1" stop-color="#3f2a1a"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" rx="48" fill="url(#avatar-bg)"/>
+  <circle cx="48" cy="36" r="18" fill="#8f633f"/>
+  <path d="M20 85c4.2-19.6 15.1-29.4 28-29.4S71.8 65.4 76 85" fill="url(#avatar-shirt)"/>
+  <path d="M30 82c3-11.2 9.6-16.8 18-16.8S63 70.8 66 82" fill="#fff7ed" opacity=".24"/>
+</svg>

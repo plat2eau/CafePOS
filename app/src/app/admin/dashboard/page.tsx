@@ -475,7 +475,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
   const fromTimestamp = parseSearchTimestamp(params.from)
   const toTimestamp = parseSearchTimestamp(params.to)
   const timezone = params.timezone?.trim() || 'Asia/Kolkata'
-  const [auth, dashboard] = await Promise.all([
+  const [, dashboard] = await Promise.all([
     requireAdminAuth(),
     getAdminDashboardData({ fromTimestamp, toTimestamp, timezone })
   ])
@@ -491,15 +491,11 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
     <main>
       <section className="hero heroShell adminSessionsShell">
         <div className="heroHeader compact">
-          <p className="eyebrow">Admin Analytics</p>
           <h1>Dashboard</h1>
           <p className="lead">
             Review gross sales, order mix, product movement, and the current floor snapshot without leaving the admin area.
           </p>
           <div className="metaPillRow">
-            <span className="metaPill">
-              Signed in as {auth.profile.display_name ?? auth.email ?? 'Staff'}
-            </span>
             <span className="metaPill">Range {rangeLabel}</span>
             <span className="metaPill">Updated {formatGeneratedAt(dashboard.generatedAt)}</span>
           </div>

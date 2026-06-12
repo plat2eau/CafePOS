@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Fragment } from 'react'
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmptyStateCard, OrderCard, ServiceRequestCard } from '@/components/AppCards'
 import SearchBar from '@/components/SearchBar'
@@ -148,6 +148,7 @@ export default function AdminConsole({
   const [expandedTableId, setExpandedTableId] = useState<string | null>(null)
   const [expandedOutCheckId, setExpandedOutCheckId] = useState<string | null>(null)
   const [isAddOrderDialogOpen, setIsAddOrderDialogOpen] = useState(false)
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
   const [orderType, setOrderType] = useState<OrderType>(tables.length > 0 ? 'table' : 'out')
   const [selectedTableId, setSelectedTableId] = useState(tables[0]?.id ?? '')
@@ -171,9 +172,11 @@ export default function AdminConsole({
   const [pendingOrderItemIds, setPendingOrderItemIds] = useState<string[]>([])
   const [removeOrderItemTarget, setRemoveOrderItemTarget] = useState<RemoveOrderItemTarget | null>(null)
   const activeOrdersCarouselRef = useRef<HTMLDivElement | null>(null)
+  const createMenuRef = useRef<HTMLDivElement | null>(null)
   const adminMenuResultsRef = useRef<HTMLDivElement | null>(null)
   const adminNavigatorInnerRef = useRef<HTMLDivElement | null>(null)
   const lastNavigatorScrollIdRef = useRef<string | null>(null)
+  const createMenuId = useId()
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase()
   const categoryNameById = useMemo(
@@ -201,6 +204,32 @@ export default function AdminConsole({
       window.clearInterval(interval)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isCreateMenuOpen) {
+      return
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!createMenuRef.current?.contains(event.target as Node)) {
+        setIsCreateMenuOpen(false)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsCreateMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isCreateMenuOpen])
 
   useEffect(() => {
     setOrderType((current) => (current === 'table' && tables.length === 0 ? 'out' : current))
@@ -1140,31 +1169,53 @@ export default function AdminConsole({
     })
   }
 
+  function openAddOrderDialog() {
+    resetOrderComposer()
+    setFlash(null)
+    setIsCreateMenuOpen(false)
+    setIsAddOrderDialogOpen(true)
+  }
+
   return (
     <div className="sectionStack">
-      <ActionGroup>
-        <Button
-          size="form"
-          className="md:w-auto"
-          type="button"
-          onClick={() => {
-            resetOrderComposer()
-            setFlash(null)
-            setIsAddOrderDialogOpen(true)
-          }}
-        >
-          Add order
-        </Button>
-      </ActionGroup>
+      <div className="adminConsoleHeader">
+        <div className="heroHeader compact">
+          <h1>Active sessions</h1>
+          <p className="lead">Manage tables, out checks, and orders.</p>
+        </div>
+        <div className="adminCreateMenu" ref={createMenuRef}>
+          <Button
+            size="icon"
+            type="button"
+            aria-label="Open create menu"
+            aria-haspopup="menu"
+            aria-expanded={isCreateMenuOpen}
+            aria-controls={createMenuId}
+            onClick={() => setIsCreateMenuOpen((current) => !current)}
+          >
+            +
+          </Button>
+          {isCreateMenuOpen ? (
+            <div className="adminCreateMenuPanel" id={createMenuId} role="menu" aria-label="Create actions">
+              <button
+                className="adminCreateMenuItem"
+                type="button"
+                role="menuitem"
+                onClick={openAddOrderDialog}
+              >
+                Add order
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
 
       {flash ? <FlashMessage tone={flash.tone}>{flash.message}</FlashMessage> : null}
 
       <SectionCard>
         <div className="activeOrdersHeader">
           <div>
-          <p className="eyebrow">Live order feed</p>
-          <h2>Active orders</h2>
-          <p>Refreshes automatically every few seconds.</p>
+            <h2>Active orders</h2>
           </div>
           {activeOrders.length > 0 ? (
             <div className="activeOrdersNav" aria-label="Active order navigation">
@@ -1190,18 +1241,16 @@ export default function AdminConsole({
           ) : null}
         </div>
 
-          {activeOrders.length === 0 ? (
-            <EmptyStateCard
-              eyebrow="Active order queue"
-              title="No active orders"
-              description="Placed and preparing table or out-check orders will appear here."
-            />
-          ) : (
-            <div className="activeOrdersCarousel" aria-label="Active orders" ref={activeOrdersCarouselRef}>
-              <div className="activeOrdersCarouselTrack">
-                {activeOrders.map((order) => (
-                  <div className="activeOrdersCarouselItem" key={order.id}>
-                    <OrderCard
+        {activeOrders.length === 0 ? (
+          <p className="finePrint">
+            <em>No active orders.</em>
+          </p>
+        ) : (
+          <div className="activeOrdersCarousel" aria-label="Active orders" ref={activeOrdersCarouselRef}>
+            <div className="activeOrdersCarouselTrack">
+              {activeOrders.map((order) => (
+                <div className="activeOrdersCarouselItem" key={order.id}>
+                  <OrderCard
                   title={order.table_id ? `Table ${order.table_id}` : 'Out check'}
                   timestamp={formatTimestamp(order.created_at)}
                   summary={
@@ -1219,26 +1268,21 @@ export default function AdminConsole({
                   }))}
                   note={order.note}
                   total={toPrice(order.total_cents)}
-                    />
-                  </div>
-                ))}
-              </div>
+                  />
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        )}
       </SectionCard>
 
       <div className="responsiveSplit">
         <SectionCard tone="support" style={{ flexGrow: 1 }}>
-          <p className="eyebrow">Active service</p>
-          <h2>Session overview</h2>
-          <p>Active table sessions and out checks are shown together for faster scanning.</p>
+          <h2>Active service</h2>
           {data.sessions.length === 0 && data.outChecks.length === 0 ? (
-            <EmptyStateCard
-              eyebrow="Active service"
-              title="No active sessions or out checks"
-              description="Occupied tables and open out checks will appear here."
-              tone="support"
-            />
+            <p className="finePrint">
+              <em>No active services.</em>
+            </p>
           ) : (
             <div className="serviceCardGrid">
               {data.sessions.map((session) => {

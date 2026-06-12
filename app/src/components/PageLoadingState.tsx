@@ -1,7 +1,7 @@
 import { SectionCard } from '@/components/ui/section-card'
 
 type PageLoadingStateProps = {
-  eyebrow: string
+  eyebrow?: string
   title: string
   description: string
   cardCount?: number
@@ -17,7 +17,7 @@ export default function PageLoadingState({
     <main>
       <section className="hero heroShell">
         <div className="heroHeader compact">
-          <p className="eyebrow">{eyebrow}</p>
+          {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
           <div className="loadingLine loadingLineTitle" />
           <div className="loadingLine loadingLineBody" />
           <p className="loadingAssistText">{description}</p>

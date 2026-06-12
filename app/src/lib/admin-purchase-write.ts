@@ -13,7 +13,7 @@ type RequestedPurchaseLine = {
   purchaseItemId?: string
   quantity?: number | string
   unit?: string
-  unitPriceCents?: number | string
+  unitPriceCents?: number | string | null
 }
 
 export type RequestedPurchasePayload = {
@@ -64,7 +64,11 @@ type NormalizeResult =
       response: ReturnType<typeof apiError>
     }
 
-function parseCents(value: number | string | undefined, fallback = 0) {
+function parseCents(value: number | string | null | undefined, fallback = 0) {
+  if (value === null) {
+    return null
+  }
+
   if (value === undefined || value === '') {
     return fallback
   }

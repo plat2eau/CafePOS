@@ -23,7 +23,7 @@ function MetricCard({ eyebrow, value, description, tone, className }: MetricCard
 }
 
 type EmptyStateCardProps = {
-  eyebrow: string
+  eyebrow?: string
   title: string
   description: string
   tone?: SectionCardProps['tone']
@@ -43,7 +43,7 @@ function EmptyStateCard({
 }: EmptyStateCardProps) {
   return (
     <SectionCard as="div" className={className} tone={tone} density={density}>
-      <p className="eyebrow">{eyebrow}</p>
+      {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
       <h2>{title}</h2>
       <p>{description}</p>
       {actions ? <div className="pt-2">{actions}</div> : null}

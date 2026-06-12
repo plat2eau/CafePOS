@@ -88,3 +88,36 @@ export async function PATCH(request: Request, context: PurchaseRouteContext) {
     message: 'Purchase updated.'
   })
 }
+
+export async function DELETE(_request: Request, context: PurchaseRouteContext) {
+  const auth = await getAdminAuthContext()
+
+  if (!auth) {
+    return unauthorizedApiError()
+  }
+
+  const { purchaseId } = await context.params
+  const supabase = createServerSupabaseClient()
+  const { data: purchase, error: purchaseError } = await supabase
+    .from('purchases')
+    .delete()
+    .eq('id', purchaseId)
+    .select('id')
+    .maybeSingle()
+
+  if (purchaseError || !purchase) {
+    return apiError('Could not remove the purchase.', 500, {
+      code: 'purchase_delete_failed',
+      context: 'admin.purchases.delete.removePurchase',
+      cause: purchaseError
+    })
+  }
+
+  revalidatePath('/admin/purchases')
+
+  return NextResponse.json({
+    ok: true,
+    purchaseId,
+    message: 'Purchase removed.'
+  })
+}
