@@ -12,6 +12,7 @@ import {
 } from '@/lib/business-day'
 import { logApiError } from '@/lib/api-errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import type { PurchasePaymentMethod, PurchasePaymentStatus, PurchaseUnit } from '@/lib/purchase-options'
 
 export type AdminOrderItem = {
   id: string
@@ -82,6 +83,45 @@ export type AdminTableOption = Pick<
   Database['public']['Tables']['tables']['Row'],
   'id' | 'label' | 'is_active'
 >
+
+export type AdminVendor = Database['public']['Tables']['vendors']['Row']
+
+export type AdminPurchaseItem = Database['public']['Tables']['purchase_items']['Row']
+
+export type AdminPurchaseLine = {
+  id: string
+  purchase_item_id: string
+  item_name: string
+  quantity: number
+  unit: PurchaseUnit
+  unit_price_cents: number
+  line_total_cents: number
+}
+
+export type AdminPurchase = {
+  id: string
+  vendor_id: string
+  vendor_name: string
+  purchase_date: string
+  invoice_number: string | null
+  payment_status: PurchasePaymentStatus
+  payment_method: PurchasePaymentMethod | null
+  notes: string | null
+  subtotal_cents: number
+  tax_cents: number
+  discount_cents: number
+  total_cents: number
+  created_at: string
+  updated_at: string
+  lines: AdminPurchaseLine[]
+}
+
+export type AdminPurchasesData = {
+  generatedAt: string
+  vendors: AdminVendor[]
+  purchaseItems: AdminPurchaseItem[]
+  purchases: AdminPurchase[]
+}
 
 export type AdminOverviewData = {
   generatedAt: string
@@ -824,4 +864,113 @@ export async function getAdminTableOptions(): Promise<AdminTableOption[]> {
   }
 
   return data ?? []
+}
+
+export async function getAdminVendors(): Promise<AdminVendor[]> {
+  const supabase = createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('vendors')
+    .select('id, name, phone, address, notes, is_active, created_at, updated_at')
+    .order('is_active', { ascending: false })
+    .order('name', { ascending: true })
+
+  if (error) {
+    throwDataLoadError('adminData.getAdminVendors', 'Could not load vendors.', error)
+  }
+
+  return data ?? []
+}
+
+export async function getAdminPurchaseItems(): Promise<AdminPurchaseItem[]> {
+  const supabase = createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('purchase_items')
+    .select('id, name, is_active, created_at, updated_at')
+    .order('is_active', { ascending: false })
+    .order('name', { ascending: true })
+
+  if (error) {
+    throwDataLoadError('adminData.getAdminPurchaseItems', 'Could not load purchase items.', error)
+  }
+
+  return data ?? []
+}
+
+export async function getAdminPurchases(limit = 50): Promise<AdminPurchase[]> {
+  const supabase = createServerSupabaseClient()
+  const { data: purchases, error: purchasesError } = await supabase
+    .from('purchases')
+    .select(
+      'id, vendor_id, purchase_date, invoice_number, payment_status, payment_method, notes, subtotal_cents, tax_cents, discount_cents, total_cents, created_at, updated_at'
+    )
+    .order('purchase_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (purchasesError) {
+    throwDataLoadError('adminData.getAdminPurchases.purchases', 'Could not load purchases.', purchasesError)
+  }
+
+  const purchaseIds = (purchases ?? []).map((purchase) => purchase.id)
+  const vendorIds = Array.from(new Set((purchases ?? []).map((purchase) => purchase.vendor_id)))
+
+  const [{ data: vendors, error: vendorsError }, { data: lines, error: linesError }] =
+    await Promise.all([
+      vendorIds.length > 0
+        ? supabase.from('vendors').select('id, name').in('id', vendorIds)
+        : Promise.resolve({ data: [], error: null }),
+      purchaseIds.length > 0
+        ? supabase
+            .from('purchase_lines')
+            .select('id, purchase_id, purchase_item_id, item_name, quantity, unit, unit_price_cents, line_total_cents')
+            .in('purchase_id', purchaseIds)
+            .order('created_at', { ascending: true })
+        : Promise.resolve({ data: [], error: null })
+    ])
+
+  if (vendorsError) {
+    throwDataLoadError('adminData.getAdminPurchases.vendors', 'Could not load purchase vendors.', vendorsError)
+  }
+
+  if (linesError) {
+    throwDataLoadError('adminData.getAdminPurchases.lines', 'Could not load purchase lines.', linesError)
+  }
+
+  const vendorNameById = new Map((vendors ?? []).map((vendor) => [vendor.id, vendor.name]))
+  const linesByPurchaseId = new Map<string, AdminPurchaseLine[]>()
+
+  for (const line of lines ?? []) {
+    const purchaseLines = linesByPurchaseId.get(line.purchase_id) ?? []
+    purchaseLines.push({
+      id: line.id,
+      purchase_item_id: line.purchase_item_id,
+      item_name: line.item_name,
+      quantity: line.quantity,
+      unit: line.unit,
+      unit_price_cents: line.unit_price_cents,
+      line_total_cents: line.line_total_cents
+    })
+    linesByPurchaseId.set(line.purchase_id, purchaseLines)
+  }
+
+  return (purchases ?? []).map((purchase) => ({
+    ...purchase,
+    vendor_name: vendorNameById.get(purchase.vendor_id) ?? 'Unknown vendor',
+    lines: linesByPurchaseId.get(purchase.id) ?? []
+  }))
+}
+
+export async function getAdminPurchasesData(): Promise<AdminPurchasesData> {
+  const [vendors, purchaseItems, purchases] = await Promise.all([
+    getAdminVendors(),
+    getAdminPurchaseItems(),
+    getAdminPurchases()
+  ])
+
+  return {
+    generatedAt: new Date().toISOString(),
+    vendors,
+    purchaseItems,
+    purchases
+  }
 }

@@ -1,9 +1,6 @@
-import Link from 'next/link'
 import { EmptyStateCard, MetricCard } from '@/components/AppCards'
 import AdminDashboardDateFilter from '@/components/AdminDashboardDateFilter'
 import AdminDashboardOrdersDialog from '@/components/AdminDashboardOrdersDialog'
-import AdminLogoutButton from '@/components/AdminLogoutButton'
-import { Button } from '@/components/ui/button'
 import { SectionCard } from '@/components/ui/section-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { SummaryRow } from '@/components/ui/summary-row'
@@ -493,24 +490,12 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
   return (
     <main>
       <section className="hero heroShell adminSessionsShell">
-        <div className="adminSessionsTopAction">
-          <AdminLogoutButton />
-        </div>
-
         <div className="heroHeader compact">
-          <Link className="backLink" href="/admin/sessions">
-            ← Back to live ops
-          </Link>
           <p className="eyebrow">Admin Analytics</p>
           <h1>Dashboard</h1>
           <p className="lead">
             Review gross sales, order mix, product movement, and the current floor snapshot without leaving the admin area.
           </p>
-          <div className="toolbar md:flex-row">
-            <Button asChild variant="secondary" size="form" className="md:w-auto">
-              <Link href="/admin/sessions">Open live sessions</Link>
-            </Button>
-          </div>
           <div className="metaPillRow">
             <span className="metaPill">
               Signed in as {auth.profile.display_name ?? auth.email ?? 'Staff'}

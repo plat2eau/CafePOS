@@ -163,11 +163,94 @@ main {
   position: relative;
 }
 
-.adminSessionsTopAction {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 5;
+.adminTopNavigator {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(1100px, calc(100% - 24px));
+  margin: 0 auto 16px;
+  padding-top: 16px;
+}
+
+.adminTopNavigatorBrandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.adminTopNavigatorLogo {
+  display: inline-flex;
+  width: min(260px, 58vw);
+}
+
+.adminTopNavigatorLogoFrame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 894 / 144;
+}
+
+.adminTopNavigatorLogoAsset {
+  object-fit: contain;
+  opacity: 0;
+}
+
+.adminTopNavigatorLogoAssetLight {
+  opacity: 1;
+}
+
+.adminTopNavigatorLogoAssetDark {
+  opacity: 0;
+}
+
+html[data-color-scheme='dark'] .adminTopNavigatorLogoAssetLight {
+  opacity: 0;
+}
+
+html[data-color-scheme='dark'] .adminTopNavigatorLogoAssetDark {
+  opacity: 1;
+}
+
+.adminTopNavigatorTabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+
+.adminTopNavigatorTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.adminTopNavigatorTab {
+  position: relative;
+  top: 1px;
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 16px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.adminTopNavigatorTab:hover {
+  color: var(--accent);
+}
+
+.adminTopNavigatorTab[data-active='true'] {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 -8px 18px rgb(var(--shadow-rgb) / 0.04);
 }
 
 .heroHeader {
@@ -1868,11 +1951,6 @@ html[data-color-scheme='dark'] .menuFloatingNavigatorPill.isActive {
 
   .adminOrderDialog {
     width: calc(100vw - 16px);
-  }
-
-  .adminSessionsTopAction {
-    position: static;
-    align-self: flex-end;
   }
 
   .adminOrderSummaryItem {

@@ -74,6 +74,147 @@ export type Database = {
           }
         ]
       }
+      purchase_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      purchase_lines: {
+        Row: {
+          created_at: string
+          id: string
+          item_name: string
+          line_total_cents: number
+          purchase_id: string
+          purchase_item_id: string
+          quantity: number
+          unit: 'kg' | 'g' | 'litre' | 'ml' | 'pcs' | 'pack' | 'box'
+          unit_price_cents: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_name: string
+          line_total_cents: number
+          purchase_id: string
+          purchase_item_id: string
+          quantity: number
+          unit: 'kg' | 'g' | 'litre' | 'ml' | 'pcs' | 'pack' | 'box'
+          unit_price_cents: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_name?: string
+          line_total_cents?: number
+          purchase_id?: string
+          purchase_item_id?: string
+          quantity?: number
+          unit?: 'kg' | 'g' | 'litre' | 'ml' | 'pcs' | 'pack' | 'box'
+          unit_price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'purchase_lines_purchase_id_fkey'
+            columns: ['purchase_id']
+            isOneToOne: false
+            referencedRelation: 'purchases'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'purchase_lines_purchase_item_id_fkey'
+            columns: ['purchase_item_id']
+            isOneToOne: false
+            referencedRelation: 'purchase_items'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      purchases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          discount_cents: number
+          id: string
+          invoice_number: string | null
+          notes: string | null
+          payment_method: 'cash' | 'upi' | 'card' | 'bank_transfer' | 'other' | null
+          payment_status: 'unpaid' | 'partial' | 'paid'
+          purchase_date: string
+          subtotal_cents: number
+          tax_cents: number
+          total_cents: number
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          discount_cents?: number
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          payment_method?: 'cash' | 'upi' | 'card' | 'bank_transfer' | 'other' | null
+          payment_status?: 'unpaid' | 'partial' | 'paid'
+          purchase_date?: string
+          subtotal_cents?: number
+          tax_cents?: number
+          total_cents?: number
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          discount_cents?: number
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          payment_method?: 'cash' | 'upi' | 'card' | 'bank_transfer' | 'other' | null
+          payment_status?: 'unpaid' | 'partial' | 'paid'
+          purchase_date?: string
+          subtotal_cents?: number
+          tax_cents?: number
+          total_cents?: number
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'purchases_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'staff_profiles'
+            referencedColumns: ['user_id']
+          },
+          {
+            foreignKeyName: 'purchases_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -340,6 +481,39 @@ export type Database = {
             referencedColumns: ['id']
           }
         ]
+      }
+      vendors: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       tables: {
         Row: {
