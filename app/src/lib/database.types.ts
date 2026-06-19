@@ -363,6 +363,117 @@ export type Database = {
         }
         Relationships: []
       }
+      tab_accounts: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          phone: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tab_charges: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          id: string
+          order_count: number
+          out_check_id: string | null
+          source_type: 'table_session' | 'out_check'
+          tab_account_id: string
+          table_session_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          id?: string
+          order_count: number
+          out_check_id?: string | null
+          source_type: 'table_session' | 'out_check'
+          tab_account_id: string
+          table_session_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          id?: string
+          order_count?: number
+          out_check_id?: string | null
+          source_type?: 'table_session' | 'out_check'
+          tab_account_id?: string
+          table_session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tab_charges_out_check_id_fkey'
+            columns: ['out_check_id']
+            isOneToOne: false
+            referencedRelation: 'out_checks'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tab_charges_tab_account_id_fkey'
+            columns: ['tab_account_id']
+            isOneToOne: false
+            referencedRelation: 'tab_accounts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tab_charges_table_session_id_fkey'
+            columns: ['table_session_id']
+            isOneToOne: false
+            referencedRelation: 'table_sessions'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      tab_payments: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          id: string
+          tab_account_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          id?: string
+          tab_account_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          id?: string
+          tab_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tab_payments_tab_account_id_fkey'
+            columns: ['tab_account_id']
+            isOneToOne: false
+            referencedRelation: 'tab_accounts'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       staff_profiles: {
         Row: {
           created_at: string
@@ -542,6 +653,21 @@ export type Database = {
       close_out_check: {
         Args: {
           p_out_check_id: string
+        }
+        Returns: undefined
+      }
+      transfer_out_check_to_tab: {
+        Args: {
+          p_out_check_id: string
+          p_tab_account_id: string
+        }
+        Returns: undefined
+      }
+      transfer_table_session_to_tab: {
+        Args: {
+          p_session_id: string
+          p_table_id: string
+          p_tab_account_id: string
         }
         Returns: undefined
       }

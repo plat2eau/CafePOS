@@ -16,6 +16,10 @@ const adminTabs = [
     label: 'Purchases'
   },
   {
+    href: '/admin/tabs',
+    label: 'Tabs'
+  },
+  {
     href: '/admin/dashboard',
     label: 'Analytics'
   }

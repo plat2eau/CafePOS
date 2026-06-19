@@ -616,6 +616,24 @@ html[data-color-scheme='dark'] .customerBrandBlinkAssetDark {
   gap: 12px;
 }
 
+.tabAccountCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
+  padding: 16px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.tabAccountCard:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--accent-rgb) / 0.45);
+  box-shadow: 0 14px 30px rgb(var(--shadow-rgb) / 0.1);
+}
+
 .purchaseIconButton {
   width: 36px;
   height: 36px;

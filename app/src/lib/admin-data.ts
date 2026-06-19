@@ -116,6 +116,35 @@ export type AdminPurchase = {
   lines: AdminPurchaseLine[]
 }
 
+export type AdminTabAccount = Database['public']['Tables']['tab_accounts']['Row']
+
+export type AdminTabPayment = Database['public']['Tables']['tab_payments']['Row']
+
+export type AdminTabCharge = Database['public']['Tables']['tab_charges']['Row'] & {
+  source_label: string
+}
+
+export type AdminTabSummary = AdminTabAccount & {
+  due_cents: number
+  total_orders: number
+  charge_cents: number
+  payment_cents: number
+  last_payment_cents: number | null
+  last_payment_at: string | null
+}
+
+export type AdminTabsData = {
+  generatedAt: string
+  tabs: AdminTabSummary[]
+}
+
+export type AdminTabDetailData = {
+  generatedAt: string
+  tab: AdminTabSummary
+  charges: AdminTabCharge[]
+  payments: AdminTabPayment[]
+}
+
 export type AdminPurchasesData = {
   generatedAt: string
   vendors: AdminVendor[]
@@ -972,5 +1001,122 @@ export async function getAdminPurchasesData(): Promise<AdminPurchasesData> {
     vendors,
     purchaseItems,
     purchases
+  }
+}
+
+function createTabSummary(
+  account: AdminTabAccount,
+  charges: Database['public']['Tables']['tab_charges']['Row'][],
+  payments: AdminTabPayment[]
+): AdminTabSummary {
+  const chargeCents = charges.reduce((sum, charge) => sum + charge.amount_cents, 0)
+  const paymentCents = payments.reduce((sum, payment) => sum + payment.amount_cents, 0)
+  const lastPayment = [...payments].sort(
+    (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+  )[0]
+
+  return {
+    ...account,
+    charge_cents: chargeCents,
+    payment_cents: paymentCents,
+    due_cents: Math.max(0, chargeCents - paymentCents),
+    total_orders: charges.reduce((sum, charge) => sum + charge.order_count, 0),
+    last_payment_cents: lastPayment?.amount_cents ?? null,
+    last_payment_at: lastPayment?.created_at ?? null
+  }
+}
+
+export async function getAdminTabsData(): Promise<AdminTabsData> {
+  const supabase = createServerSupabaseClient()
+  const [{ data: accounts, error: accountsError }, { data: charges, error: chargesError }, { data: payments, error: paymentsError }] =
+    await Promise.all([
+      supabase
+        .from('tab_accounts')
+        .select('id, name, phone, is_active, created_at, updated_at')
+        .eq('is_active', true)
+        .order('name', { ascending: true }),
+      supabase
+        .from('tab_charges')
+        .select('id, tab_account_id, source_type, table_session_id, out_check_id, amount_cents, order_count, created_at'),
+      supabase
+        .from('tab_payments')
+        .select('id, tab_account_id, amount_cents, created_at')
+    ])
+
+  if (accountsError) {
+    throwDataLoadError('adminData.getAdminTabsData.accounts', 'Could not load tab accounts.', accountsError)
+  }
+
+  if (chargesError) {
+    throwDataLoadError('adminData.getAdminTabsData.charges', 'Could not load tab charges.', chargesError)
+  }
+
+  if (paymentsError) {
+    throwDataLoadError('adminData.getAdminTabsData.payments', 'Could not load tab payments.', paymentsError)
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    tabs: (accounts ?? []).map((account) =>
+      createTabSummary(
+        account,
+        (charges ?? []).filter((charge) => charge.tab_account_id === account.id),
+        (payments ?? []).filter((payment) => payment.tab_account_id === account.id)
+      )
+    )
+  }
+}
+
+export async function getAdminTabDetailData(tabId: string): Promise<AdminTabDetailData | null> {
+  const supabase = createServerSupabaseClient()
+  const { data: account, error: accountError } = await supabase
+    .from('tab_accounts')
+    .select('id, name, phone, is_active, created_at, updated_at')
+    .eq('id', tabId)
+    .maybeSingle()
+
+  if (accountError) {
+    throwDataLoadError('adminData.getAdminTabDetailData.account', 'Could not load tab account.', accountError)
+  }
+
+  if (!account) {
+    return null
+  }
+
+  const [{ data: charges, error: chargesError }, { data: payments, error: paymentsError }] =
+    await Promise.all([
+      supabase
+        .from('tab_charges')
+        .select('id, tab_account_id, source_type, table_session_id, out_check_id, amount_cents, order_count, created_at')
+        .eq('tab_account_id', tabId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('tab_payments')
+        .select('id, tab_account_id, amount_cents, created_at')
+        .eq('tab_account_id', tabId)
+        .order('created_at', { ascending: false })
+    ])
+
+  if (chargesError) {
+    throwDataLoadError('adminData.getAdminTabDetailData.charges', 'Could not load tab charges.', chargesError)
+  }
+
+  if (paymentsError) {
+    throwDataLoadError('adminData.getAdminTabDetailData.payments', 'Could not load tab payments.', paymentsError)
+  }
+
+  const normalizedCharges = (charges ?? []).map((charge) => ({
+    ...charge,
+    source_label:
+      charge.source_type === 'table_session'
+        ? `Table session ${charge.table_session_id?.slice(0, 8) ?? ''}`
+        : `Out check ${charge.out_check_id?.slice(0, 8) ?? ''}`
+  }))
+
+  return {
+    generatedAt: new Date().toISOString(),
+    tab: createTabSummary(account, charges ?? [], payments ?? []),
+    charges: normalizedCharges,
+    payments: payments ?? []
   }
 }

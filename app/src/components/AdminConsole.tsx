@@ -34,6 +34,7 @@ import type {
   AdminOrder,
   AdminOutCheck,
   AdminOverviewData,
+  AdminTabsData,
   AdminTableOption
 } from '@/lib/admin-data'
 import type { Database } from '@/lib/database.types'
@@ -136,6 +137,23 @@ async function fetchOverviewData() {
   return result.data
 }
 
+async function fetchTabsData() {
+  const result = await apiFetch<AdminTabsData>(
+    '/api/admin/tabs',
+    {
+      method: 'GET',
+      cache: 'no-store'
+    },
+    'Could not load tab accounts.'
+  )
+
+  if (!result.ok) {
+    return null
+  }
+
+  return result.data
+}
+
 export default function AdminConsole({
   initialData,
   menuCategories,
@@ -169,6 +187,10 @@ export default function AdminConsole({
   const [pendingReceiptOutCheckId, setPendingReceiptOutCheckId] = useState<string | null>(null)
   const [closeTargetOutCheckId, setCloseTargetOutCheckId] = useState<string | null>(null)
   const [isClosingOutCheck, setIsClosingOutCheck] = useState(false)
+  const [tabsData, setTabsData] = useState<AdminTabsData | null>(null)
+  const [selectedTabAccountId, setSelectedTabAccountId] = useState('')
+  const [isLoadingTabs, setIsLoadingTabs] = useState(false)
+  const [isTransferringToTab, setIsTransferringToTab] = useState(false)
   const [pendingOrderItemIds, setPendingOrderItemIds] = useState<string[]>([])
   const [removeOrderItemTarget, setRemoveOrderItemTarget] = useState<RemoveOrderItemTarget | null>(null)
   const activeOrdersCarouselRef = useRef<HTMLDivElement | null>(null)
@@ -230,6 +252,38 @@ export default function AdminConsole({
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isCreateMenuOpen])
+
+  useEffect(() => {
+    const shouldLoadTabs = Boolean(clearTargetTableId || closeTargetOutCheckId)
+
+    if (!shouldLoadTabs || tabsData) {
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingTabs(true)
+
+    async function loadTabs() {
+      const nextTabsData = await fetchTabsData()
+
+      if (cancelled) {
+        return
+      }
+
+      if (nextTabsData) {
+        setTabsData(nextTabsData)
+        setSelectedTabAccountId((current) => current || nextTabsData.tabs[0]?.id || '')
+      }
+
+      setIsLoadingTabs(false)
+    }
+
+    void loadTabs()
+
+    return () => {
+      cancelled = true
+    }
+  }, [clearTargetTableId, closeTargetOutCheckId, tabsData])
 
   useEffect(() => {
     setOrderType((current) => (current === 'table' && tables.length === 0 ? 'out' : current))
@@ -831,6 +885,57 @@ export default function AdminConsole({
     setIsClosingOutCheck(false)
   }
 
+  async function handleTransferOutCheckToTab() {
+    if (!closeTargetOutCheckId || !selectedTabAccountId) {
+      setFlash({ tone: 'error', message: 'Choose a tab account first.' })
+      return
+    }
+
+    setFlash(null)
+    setIsTransferringToTab(true)
+
+    const result = await apiFetch<{ message?: string }>(
+      `/api/admin/out-checks/${closeTargetOutCheckId}/transfer-to-tab`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          tabAccountId: selectedTabAccountId
+        })
+      },
+      'Could not transfer the out check to tab.'
+    )
+
+    if (!result.ok) {
+      if (result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
+      setFlash({
+        tone: 'error',
+        message: result.message
+      })
+      setIsTransferringToTab(false)
+      return
+    }
+
+    const nextData = await fetchOverviewData()
+    if (nextData) {
+      setData(nextData)
+    }
+
+    setTabsData(null)
+    setCloseTargetOutCheckId(null)
+    setFlash({
+      tone: 'success',
+      message: result.data?.message ?? 'Out check transferred to tab.'
+    })
+    setIsTransferringToTab(false)
+  }
+
   async function handleOrderStatusChange(
     tableId: string,
     orderId: string,
@@ -1051,6 +1156,73 @@ export default function AdminConsole({
       message: result.data?.message ?? 'Table session cleared.'
     })
     setIsClearingTable(false)
+  }
+
+  async function handleTransferTableToTab() {
+    if (!clearTargetTableId || !clearTargetSession || !selectedTabAccountId) {
+      setFlash({ tone: 'error', message: 'Choose a tab account first.' })
+      return
+    }
+
+    setFlash(null)
+    setIsTransferringToTab(true)
+
+    const result = await apiFetch<{ message?: string }>(
+      `/api/admin/tables/${clearTargetTableId}/session/transfer-to-tab`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sessionId: clearTargetSession.id,
+          tabAccountId: selectedTabAccountId
+        })
+      },
+      'Could not transfer the table session to tab.'
+    )
+
+    if (!result.ok) {
+      if (result.status === 401) {
+        router.replace('/admin/login?error=unauthorized')
+        return
+      }
+
+      setFlash({
+        tone: 'error',
+        message: result.message
+      })
+      setIsTransferringToTab(false)
+      return
+    }
+
+    const nextData = await fetchOverviewData()
+
+    if (nextData) {
+      setData(nextData)
+    } else {
+      setData((current) => ({
+        ...current,
+        sessions: current.sessions.filter((session) => session.id !== clearTargetSession.id),
+        orders: current.orders.filter((order) => order.session_id !== clearTargetSession.id),
+        serviceRequests: current.serviceRequests.filter(
+          (request) => request.session_id !== clearTargetSession.id
+        )
+      }))
+    }
+
+    if (expandedTableId === clearTargetTableId) {
+      setExpandedTableId(null)
+    }
+
+    setTabsData(null)
+    setClearTargetTableId(null)
+    setDiscountPercentage('')
+    setFlash({
+      tone: 'success',
+      message: result.data?.message ?? 'Table session transferred to tab.'
+    })
+    setIsTransferringToTab(false)
   }
 
   async function handleOpenTableReceipt() {
@@ -1614,19 +1786,19 @@ export default function AdminConsole({
       <Dialog
         open={Boolean(closeTargetOutCheck)}
         onOpenChange={(open) => {
-          if (!open && !isClosingOutCheck && pendingReceiptOutCheckId === null) {
+          if (!open && !isClosingOutCheck && !isTransferringToTab && pendingReceiptOutCheckId === null) {
             setCloseTargetOutCheckId(null)
           }
         }}
       >
         <DialogContent
           onEscapeKeyDown={(event) => {
-            if (isClosingOutCheck || pendingReceiptOutCheckId !== null) {
+            if (isClosingOutCheck || isTransferringToTab || pendingReceiptOutCheckId !== null) {
               event.preventDefault()
             }
           }}
           onInteractOutside={(event) => {
-            if (isClosingOutCheck || pendingReceiptOutCheckId !== null) {
+            if (isClosingOutCheck || isTransferringToTab || pendingReceiptOutCheckId !== null) {
               event.preventDefault()
             }
           }}
@@ -1656,13 +1828,31 @@ export default function AdminConsole({
                   </strong>
                 </SummaryRow>
               </div>
+              <div className="formField">
+                <label htmlFor="out-check-transfer-tab">Transfer to tab</label>
+                <select
+                  id="out-check-transfer-tab"
+                  value={selectedTabAccountId}
+                  disabled={isLoadingTabs || isClosingOutCheck || isTransferringToTab}
+                  onChange={(event) => setSelectedTabAccountId(event.target.value)}
+                >
+                  <option value="">
+                    {isLoadingTabs ? 'Loading tabs...' : 'Choose tab account'}
+                  </option>
+                  {(tabsData?.tabs ?? []).map((tab) => (
+                    <option key={tab.id} value={tab.id}>
+                      {tab.name} - {tab.phone} - {toPrice(tab.due_cents)} due
+                    </option>
+                  ))}
+                </select>
+              </div>
               <DialogFooter>
                 <LoadingButton
                   size="form"
                   type="button"
                   loading={pendingReceiptOutCheckId === closeTargetOutCheck.id}
                   loadingLabel="Opening receipt..."
-                  disabled={isClosingOutCheck || pendingReceiptOutCheckId !== null}
+                  disabled={isClosingOutCheck || isTransferringToTab || pendingReceiptOutCheckId !== null}
                   onClick={() => void handleOpenOutCheckReceipt(closeTargetOutCheck.id)}
                 >
                   Open receipt
@@ -1673,12 +1863,28 @@ export default function AdminConsole({
                   type="button"
                   loading={isClosingOutCheck}
                   loadingLabel="Closing out check..."
-                  disabled={isClosingOutCheck}
+                  disabled={isClosingOutCheck || isTransferringToTab}
                   onClick={() => void handleCloseOutCheck()}
                 >
                   Close out check
                 </LoadingButton>
-                <DialogClose asChild disabled={isClosingOutCheck || pendingReceiptOutCheckId !== null}>
+                <LoadingButton
+                  variant="secondary"
+                  size="form"
+                  type="button"
+                  loading={isTransferringToTab}
+                  loadingLabel="Transferring..."
+                  disabled={
+                    isClosingOutCheck ||
+                    isTransferringToTab ||
+                    pendingReceiptOutCheckId !== null ||
+                    !selectedTabAccountId
+                  }
+                  onClick={() => void handleTransferOutCheckToTab()}
+                >
+                  Transfer to tab
+                </LoadingButton>
+                <DialogClose asChild disabled={isClosingOutCheck || isTransferringToTab || pendingReceiptOutCheckId !== null}>
                   <Button variant="secondary" size="form" type="button">
                     Cancel
                   </Button>
@@ -1692,7 +1898,7 @@ export default function AdminConsole({
       <Dialog
         open={Boolean(clearTargetSession)}
         onOpenChange={(open) => {
-          if (!open && !isClearingTable && !isOpeningReceipt) {
+          if (!open && !isClearingTable && !isOpeningReceipt && !isTransferringToTab) {
             setClearTargetTableId(null)
             setDiscountPercentage('')
           }
@@ -1700,12 +1906,12 @@ export default function AdminConsole({
       >
         <DialogContent
           onEscapeKeyDown={(event) => {
-            if (isClearingTable || isOpeningReceipt) {
+            if (isClearingTable || isOpeningReceipt || isTransferringToTab) {
               event.preventDefault()
             }
           }}
           onInteractOutside={(event) => {
-            if (isClearingTable || isOpeningReceipt) {
+            if (isClearingTable || isOpeningReceipt || isTransferringToTab) {
               event.preventDefault()
             }
           }}
@@ -1752,13 +1958,31 @@ export default function AdminConsole({
                   onChange={(event) => setDiscountPercentage(event.target.value)}
                 />
               </div>
+              <div className="formField">
+                <label htmlFor="table-transfer-tab">Transfer to tab</label>
+                <select
+                  id="table-transfer-tab"
+                  value={selectedTabAccountId}
+                  disabled={isLoadingTabs || isClearingTable || isTransferringToTab}
+                  onChange={(event) => setSelectedTabAccountId(event.target.value)}
+                >
+                  <option value="">
+                    {isLoadingTabs ? 'Loading tabs...' : 'Choose tab account'}
+                  </option>
+                  {(tabsData?.tabs ?? []).map((tab) => (
+                    <option key={tab.id} value={tab.id}>
+                      {tab.name} - {tab.phone} - {toPrice(tab.due_cents)} due
+                    </option>
+                  ))}
+                </select>
+              </div>
               <DialogFooter>
                 <LoadingButton
                   size="form"
                   type="button"
                   loading={isOpeningReceipt}
                   loadingLabel="Opening receipt..."
-                  disabled={isClearingTable || isOpeningReceipt}
+                  disabled={isClearingTable || isOpeningReceipt || isTransferringToTab}
                   onClick={() => void handleOpenTableReceipt()}
                 >
                   Open receipt
@@ -1769,12 +1993,23 @@ export default function AdminConsole({
                   type="button"
                   loading={isClearingTable}
                   loadingLabel="Clearing table..."
-                  disabled={isClearingTable}
+                  disabled={isClearingTable || isTransferringToTab}
                   onClick={() => void handleClearTable()}
                 >
                   Clear table
                 </LoadingButton>
-                <DialogClose asChild disabled={isClearingTable || isOpeningReceipt}>
+                <LoadingButton
+                  variant="secondary"
+                  size="form"
+                  type="button"
+                  loading={isTransferringToTab}
+                  loadingLabel="Transferring..."
+                  disabled={isClearingTable || isOpeningReceipt || isTransferringToTab || !selectedTabAccountId}
+                  onClick={() => void handleTransferTableToTab()}
+                >
+                  Transfer to tab
+                </LoadingButton>
+                <DialogClose asChild disabled={isClearingTable || isOpeningReceipt || isTransferringToTab}>
                   <Button variant="secondary" size="form" type="button">
                     Cancel
                   </Button>
